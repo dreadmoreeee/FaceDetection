@@ -1,113 +1,147 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webcam con Silueta de Cabeza</title>
-    <style>
-        /* === Estilos Generales === */
-        body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
-            font-family: sans-serif;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Webcam con Detección Facial Universal</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f0f0f0;
+      font-family: sans-serif;
+    }
 
-        /* === Contenedor de la Cámara y el Overlay === */
-        .camera-container {
-            position: relative;
-            width: 100%;
-            max-width: 800px;
-            overflow: hidden;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            /* Importante: Establecemos una relación de aspecto base */
-            aspect-ratio: 4 / 3; 
-            background-color: #000; /* Fondo negro por si el video no llena todo */
-        }
+    .camera-container {
+      position: relative;
+      width: 100%;
+      max-width: 800px;
+      aspect-ratio: 4 / 3;
+      overflow: hidden;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      background-color: #000;
+    }
 
-        /* === Elemento de Video (Cámara) === */
-        #camera-preview {
-            /* Hacemos que el video llene el contenedor, recortando si es necesario */
-            width: 100%;
-            height: 100%;
-            object-fit: cover; 
-            display: block;
-            transform: scaleX(-1); /* Reflejo opcional */
-        }
+    #camera-preview {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1); /* efecto espejo */
+      display: block;
+    }
 
-        /* === El Overlay SVG (Reemplaza al div) === */
-        #overlay-svg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none; 
-        }
-
-    </style>
+    #face-canvas,
+    #overlay-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+  </style>
 </head>
 <body>
 
-    <h1>Coloca tu rostro en la silueta 👤</h1>
-    
-    <div class="camera-container">
-        
-        <video id="camera-preview" autoplay playsinline></video>
+  <h1>Coloca tu rostro en la silueta 👤</h1>
 
-        <svg id="overlay-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
-            
-            <path fill-rule="evenodd" 
-                  fill="rgba(255, 255, 255, 0.85)"
-                  d="M 0 0 H 100 V 100 H 0 Z 
-                     M 50 20 
-                     Q 20 25, 25 50 
-                     Q 25 75, 50 85 
-                     Q 75 75, 75 50 
-                     Q 80 25, 50 20 Z">
-            </path>
-            
-            <path fill="none"
-                  stroke="#007bff"
-                  stroke-width="0.5"
-                  stroke-dasharray="2 2"
-                  d="M 50 20 
-                     Q 20 25, 25 50 
-                     Q 25 75, 50 85 
-                     Q 75 75, 75 50 
-                     Q 80 25, 50 20 Z">
-            </path>
-        </svg>
+  <div class="camera-container">
+    <video id="camera-preview" autoplay playsinline></video>
+    <canvas id="face-canvas"></canvas>
 
-    </div>
+    <!-- Overlay SVG de silueta -->
+    <svg id="overlay-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+      <path fill-rule="evenodd" fill="rgba(255, 255, 255, 0.85)"
+        d="M 0 0 H 100 V 100 H 0 Z 
+           M 50 20 
+           Q 20 25, 25 50 
+           Q 25 75, 50 85 
+           Q 75 75, 75 50 
+           Q 80 25, 50 20 Z"></path>
+      <path fill="none" stroke="#007bff" stroke-width="0.5" stroke-dasharray="2 2"
+        d="M 50 20 
+           Q 20 25, 25 50 
+           Q 25 75, 50 85 
+           Q 75 75, 75 50 
+           Q 80 25, 50 20 Z"></path>
+    </svg>
+  </div>
 
-    <script>
-        // === JavaScript (SIN CAMBIOS) ===
-        const videoElement = document.getElementById('camera-preview');
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                videoElement.srcObject = stream;
-                // Esperamos a que el video tenga datos para evitar un fotograma negro
-                videoElement.onloadedmetadata = () => {
-                    videoElement.play();
-                };
-                console.log("Cámara iniciada con silueta de cabeza SVG.");
-            } catch (error) {
-                console.error("Ocurrió un error al acceder a la cámara: ", error);
-                const container = document.querySelector('.camera-container');
-                const errorMessage = document.createElement('p');
-                errorMessage.style.color = 'red';
-                errorMessage.textContent = '❌ Error: Asegúrate de tener cámara y otorgar permisos.';
-                container.parentNode.insertBefore(errorMessage, container.nextSibling); 
-            }
+  <!-- 🔹 Importar MediaPipe Face Detection -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <script>
+    const videoElement = document.getElementById('camera-preview');
+    const canvasElement = document.getElementById('face-canvas');
+    const ctx = canvasElement.getContext('2d');
+
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      videoElement.srcObject = stream;
+
+      videoElement.onloadedmetadata = () => {
+        videoElement.play();
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+        startFaceDetection();
+      };
+    }
+
+    function startFaceDetection() {
+      const faceDetection = new FaceDetection.FaceDetection({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
+      });
+
+      faceDetection.setOptions({
+        model: 'short', // modelo rápido (puedes usar 'full' para más precisión)
+        minDetectionConfidence: 0.6,
+      });
+
+      faceDetection.onResults(onResults);
+
+      const camera = new Camera(videoElement, {
+        onFrame: async () => {
+          await faceDetection.send({ image: videoElement });
+        },
+        width: 800,
+        height: 600
+      });
+      camera.start();
+    }
+
+    function onResults(results) {
+      ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+      if (results.detections && results.detections.length > 0) {
+        for (const detection of results.detections) {
+          const box = detection.boundingBox;
+          const mirroredX = canvasElement.width - box.xMin * canvasElement.width - box.width * canvasElement.width;
+
+          ctx.beginPath();
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = 'lime';
+          ctx.rect(
+            mirroredX,
+            box.yMin * canvasElement.height,
+            box.width * canvasElement.width,
+            box.height * canvasElement.height
+          );
+          ctx.stroke();
+
+          ctx.font = "16px sans-serif";
+          ctx.fillStyle = "lime";
+          ctx.fillText("Rostro detectado", mirroredX, box.yMin * canvasElement.height - 5);
         }
-        startCamera();
-    </script>
+      }
+    }
+
+    startCamera();
+  </script>
 </body>
 </html>
