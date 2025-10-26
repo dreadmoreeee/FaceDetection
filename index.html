@@ -1,147 +1,185 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Webcam con Detección Facial Universal</title>
-  <style>
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-      background-color: #f0f0f0;
-      font-family: sans-serif;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam con Detección de Rostro</title>
+    
+    <style>
+        /* === Estilos Generales === */
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+        }
 
-    .camera-container {
-      position: relative;
-      width: 100%;
-      max-width: 800px;
-      aspect-ratio: 4 / 3;
-      overflow: hidden;
-      border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-      background-color: #000;
-    }
+        /* === Contenedor de la Cámara y el Overlay === */
+        .camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            overflow: hidden;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            aspect-ratio: 4 / 3; 
+        }
 
-    #camera-preview {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1); /* efecto espejo */
-      display: block;
-    }
+        /* === Elemento de Video (Cámara) === */
+        #camera-preview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transform: scaleX(-1); /* Volteo de espejo */
+        }
 
-    #face-canvas,
-    #overlay-svg {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-  </style>
+        /* === Overlay SVG (El hueco) === */
+        #overlay-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; 
+        }
+
+        /* === Canvas de Detección === */
+        #detection-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            transform: scaleX(-1); 
+        }
+
+    </style>
 </head>
 <body>
 
-  <h1>Coloca tu rostro en la silueta 👤</h1>
+    <h1>Detección de Rostro en Vivo</h1>
+    <p id="loading-message" style="text-align: center;">Cargando modelos de IA... 🧠</p>
+    
+    <div class="camera-container">
+        
+        <video id="camera-preview" autoplay playsinline muted></video>
 
-  <div class="camera-container">
-    <video id="camera-preview" autoplay playsinline></video>
-    <canvas id="face-canvas"></canvas>
+        <svg id="overlay-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <path fill-rule="evenodd" 
+                  fill="rgba(255, 255, 255, 0.85)"
+                  d="M 0 0 H 100 V 100 H 0 Z 
+                     M 50 30 
+                     A 15 20 0 1 1 50 70 
+                     A 15 20 0 1 1 50 30 Z">
+            </path>
+            <path fill="none"
+                  stroke="#007bff"
+                  stroke-width="0.5"
+                  stroke-dasharray="2 2"
+                  d="M 50 30 
+                     A 15 20 0 1 1 50 70 
+                     A 15 20 0 1 1 50 30 Z">
+            </path>
+        </svg>
 
-    <!-- Overlay SVG de silueta -->
-    <svg id="overlay-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
-      <path fill-rule="evenodd" fill="rgba(255, 255, 255, 0.85)"
-        d="M 0 0 H 100 V 100 H 0 Z 
-           M 50 20 
-           Q 20 25, 25 50 
-           Q 25 75, 50 85 
-           Q 75 75, 75 50 
-           Q 80 25, 50 20 Z"></path>
-      <path fill="none" stroke="#007bff" stroke-width="0.5" stroke-dasharray="2 2"
-        d="M 50 20 
-           Q 20 25, 25 50 
-           Q 25 75, 50 85 
-           Q 75 75, 75 50 
-           Q 80 25, 50 20 Z"></path>
-    </svg>
-  </div>
+        <canvas id="detection-canvas"></canvas>
 
-  <!-- 🔹 Importar MediaPipe Face Detection -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    </div>
 
-  <script>
-    const videoElement = document.getElementById('camera-preview');
-    const canvasElement = document.getElementById('face-canvas');
-    const ctx = canvasElement.getContext('2d');
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
-    async function startCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      videoElement.srcObject = stream;
+    <script>
+        const videoElement = document.getElementById('camera-preview');
+        const canvas = document.getElementById('detection-canvas');
+        const loadingMessage = document.getElementById('loading-message');
+        
+        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
 
-      videoElement.onloadedmetadata = () => {
-        videoElement.play();
-        canvasElement.width = videoElement.videoWidth;
-        canvasElement.height = videoElement.videoHeight;
-        startFaceDetection();
-      };
-    }
-
-    function startFaceDetection() {
-      const faceDetection = new FaceDetection.FaceDetection({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
-      });
-
-      faceDetection.setOptions({
-        model: 'short', // modelo rápido (puedes usar 'full' para más precisión)
-        minDetectionConfidence: 0.6,
-      });
-
-      faceDetection.onResults(onResults);
-
-      const camera = new Camera(videoElement, {
-        onFrame: async () => {
-          await faceDetection.send({ image: videoElement });
-        },
-        width: 800,
-        height: 600
-      });
-      camera.start();
-    }
-
-    function onResults(results) {
-      ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-      if (results.detections && results.detections.length > 0) {
-        for (const detection of results.detections) {
-          const box = detection.boundingBox;
-          const mirroredX = canvasElement.width - box.xMin * canvasElement.width - box.width * canvasElement.width;
-
-          ctx.beginPath();
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = 'lime';
-          ctx.rect(
-            mirroredX,
-            box.yMin * canvasElement.height,
-            box.width * canvasElement.width,
-            box.height * canvasElement.height
-          );
-          ctx.stroke();
-
-          ctx.font = "16px sans-serif";
-          ctx.fillStyle = "lime";
-          ctx.fillText("Rostro detectado", mirroredX, box.yMin * canvasElement.height - 5);
+        // --- Cargar los Modelos (Modificado) ---
+        async function loadModels() {
+            try {
+                // Ahora 'faceapi' debería estar definido
+                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+                await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+                console.log("Modelos de face-api.js cargados correctamente.");
+                loadingMessage.innerText = "¡Modelos cargados! Iniciando cámara...";
+            } catch (error) {
+                console.error("Error al cargar los modelos de face-api.js: ", error);
+                loadingMessage.innerText = "❌ Error al cargar los modelos. Revisa la consola.";
+                // ** CAMBIO CLAVE 2: Lanzar el error para detener 'main' **
+                throw new Error("Fallo al cargar modelos");
+            }
         }
-      }
-    }
 
-    startCamera();
-  </script>
+        // --- Iniciar la Cámara ---
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoElement.srcObject = stream;
+                // No llamamos a play() aquí, esperamos al evento 'play'
+            } catch (error) {
+                console.error("Error al acceder a la cámara: ", error);
+                loadingMessage.innerText = "❌ Error al acceder a la cámara. Asegúrate de dar permisos.";
+            }
+        }
+
+        // --- Loop de Detección y Dibujo ---
+        async function startFaceDetection() {
+            console.log("Iniciando detección de rostros...");
+            loadingMessage.style.display = 'none'; // Ocultamos el mensaje de carga
+
+            const displaySize = { width: videoElement.clientWidth, height: videoElement.clientHeight };
+            faceapi.matchDimensions(canvas, displaySize);
+
+            setInterval(async () => {
+                try {
+                    const detections = await faceapi.detectAllFaces(
+                        videoElement, 
+                        new faceapi.TinyFaceDetectorOptions()
+                    ).withFaceLandmarks();
+
+                    const resizedDetections = faceapi.resizeResults(detections, displaySize);
+
+                    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+
+                    faceapi.draw.drawDetections(canvas, resizedDetections);
+                    faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+
+                } catch (error) {
+                    // Este catch es para errores *durante* la detección, no en la carga
+                    console.error("Error en el loop de detección: ", error);
+                }
+            }, 100); 
+        }
+
+        // --- Función Principal (Modificada) ---
+        async function main() {
+            // ** CAMBIO CLAVE 3: Envolvemos 'main' en try...catch **
+            try {
+                // 1. Cargamos los modelos
+                await loadModels();
+                
+                // 2. Iniciamos la cámara (Solo si los modelos cargaron bien)
+                await startCamera();
+
+                videoElement.addEventListener('play', () => {
+                    startFaceDetection();
+                });
+
+            } catch (error) {
+                console.error("No se pudo iniciar la aplicación:", error.message);
+            }
+        }
+
+        // ¡Ejecutamos la función principal!
+        main();
+
+    </script>
 </body>
 </html>
