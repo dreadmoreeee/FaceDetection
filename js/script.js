@@ -15,7 +15,7 @@ const GUIDE_WIDTH_PERCENT = 28;
 const TOLERANCE_CENTER_PERCENT = 5; 
 
 // Tolerancia de tamaño (flexible abajo, estricta arriba para evitar hombros)
-const TOLERANCE_SIZE_MIN_FACTOR = 0.1;  // Permite hasta 70% del ancho del óvalo (usuario cerca)
+const TOLERANCE_SIZE_MIN_FACTOR = 0.3;  // Permite hasta 70% del ancho del óvalo (usuario cerca)
 const TOLERANCE_SIZE_MAX_FACTOR = 1; // Máximo 105% del ancho del óvalo (impide usuario lejos)
 
 // --- CONTROL DE FLUJO DE CAPTURA ---
@@ -212,5 +212,6 @@ function showPhoto(imageDataURL) {
     finalPhoto.src = imageDataURL;
     photoContainer.classList.add('show');
 }
+
 
 
