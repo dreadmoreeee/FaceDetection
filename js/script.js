@@ -79,43 +79,44 @@ async function detectFaces(canvas, displaySize) {
 }
 
 
-// 4. Función de Verificación de Alineación
+// 4. Función de Verificación de Alineación (CORREGIDA PARA MÓVILES)
 function checkAlignment(detection) {
     const box = detection.box;
     
     // --- PASO 1: Determinar el centro del video en píxeles del DOM ---
-    // Usamos getBoundingClientRect para obtener la posición real en pantalla
     const videoRect = video.getBoundingClientRect();
     
-    // Calculamos el centro del óvalo de guía en coordenadas de PANTALLA
-    // El óvalo está fijo en CSS, centrado en el video.
+    // El centro de la guía ovalada en coordenadas de PANTALLA
     const guideScreenCenterX = videoRect.left + videoRect.width / 2;
     const guideScreenCenterY = videoRect.top + videoRect.height / 2;
 
-    // --- PASO 2: Determinar el centro del rostro en píxeles del DOM ---
-    // La caja de detección (box) está en píxeles del VIDEO SOURCE (video.videoWidth/video.videoHeight).
-    // Necesitamos mapearla a píxeles de PANTALLA (videoRect.width/videoRect.height).
+    // --- PASO 2: Determinar el centro del rostro en píxeles de PANTALLA (Volteo aplicado) ---
     
     // Centro del rostro en píxeles del SOURCE (relativo al video source)
     const faceSourceCenterX = box.x + box.width / 2;
     const faceSourceCenterY = box.y + box.height / 2;
 
-    // Centro del rostro en píxeles de PANTALLA (relativo a la pantalla)
-    const faceScreenCenterX = videoRect.left + faceSourceCenterX * (videoRect.width / video.videoWidth);
-    const faceScreenCenterY = videoRect.top + faceSourceCenterY * (videoRect.height / video.videoHeight);
+    // Centro del rostro en píxeles de PANTALLA
+    const faceScreenX = videoRect.left + faceSourceCenterX * (videoRect.width / video.videoWidth);
+    const faceScreenY = videoRect.top + faceSourceCenterY * (videoRect.height / video.videoHeight);
+    
+    
+    // *** CORRECCIÓN CLAVE PARA EFECTO ESPEJO ***
+    // Si la cámara tiene efecto espejo (lo más común en móviles), 
+    // necesitamos invertir la coordenada X de la detección respecto al centro del video.
+    // Calculamos el centro X reflejado.
+    const mirroredFaceScreenCenterX = videoRect.left + (videoRect.width - (faceScreenX - videoRect.left));
+
+    // Usamos el centro X reflejado para la comparación
+    const diffX = Math.abs(mirroredFaceScreenCenterX - guideScreenCenterX);
+    const diffY = Math.abs(faceScreenY - guideScreenCenterY);
     
     // --- PASO 3: Comprobar Centrado (Posición) ---
-    const diffX = Math.abs(faceScreenCenterX - guideScreenCenterX);
-    const diffY = Math.abs(faceScreenCenterY - guideScreenCenterY);
-    
     const isCentered = diffX < TOLERANCE_CENTER && diffY < TOLERANCE_CENTER;
     
-    // --- PASO 4: Comprobar Tamaño (Aproximación) ---
-    // Verificamos si el ancho de la cara está cerca del ancho del óvalo (300px)
-    // El ancho de la cara está en píxeles de PANTALLA:
+    // --- PASO 4: Comprobar Tamaño (El tamaño no cambia con el volteo) ---
     const faceScreenWidth = box.width * (videoRect.width / video.videoWidth);
     
-    // La cara debe ser un poco más pequeña que el óvalo (GUIDE_WIDTH)
     const isSized = faceScreenWidth > (GUIDE_WIDTH / TOLERANCE_SIZE) && 
                     faceScreenWidth < (GUIDE_WIDTH * TOLERANCE_SIZE);
                     
