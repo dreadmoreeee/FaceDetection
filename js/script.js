@@ -10,7 +10,7 @@ const GUIDE_CENTER_X = 50;
 const GUIDE_CENTER_Y = 50;  
 const GUIDE_WIDTH_PERCENT = 28; 
 const TOLERANCE_CENTER_PERCENT = 8; 
-const TOLERANCE_SIZE = 1.1;          
+const TOLERANCE_SIZE = 1.2;          
 
 // --- CONTROL DE FLUJO DE CAPTURA ---
 let isCountingDown = false; 
@@ -202,6 +202,7 @@ function showPhoto(imageDataURL) {
     finalPhoto.src = imageDataURL;
     photoContainer.classList.add('show');
 }
+
 
 
 
