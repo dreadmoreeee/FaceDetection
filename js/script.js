@@ -5,29 +5,20 @@ const countdownMessage = document.getElementById('countdown-message');
 const photoContainer = document.getElementById('final-photo-container');
 const finalPhoto = document.getElementById('final-photo');
 
-// --- CONSTANTES DE ALINEACIÓN ---
 const GUIDE_CENTER_X = 50;  
 const GUIDE_CENTER_Y = 50;  
-// CAMBIO CRÍTICO: Aumentamos el tamaño objetivo a 40% del ancho del video.
-// Esto permite al usuario acercarse más a la cámara.
-const GUIDE_WIDTH_PERCENT = 40; 
 
-// Tolerancia de centrado estricta: 5%
+let guideWidthPercent = 0; 
+
 const TOLERANCE_CENTER_PERCENT = 5; 
 
-// CAMBIOS DE LÍMITES DE TAMAÑO:
-// Límite MÍNIMO: 0.9. La cara debe ser al menos el 90% del óvalo (más estricto).
 const TOLERANCE_SIZE_MIN_FACTOR = 0.9;  
-// Límite MÁXIMO: 1.0. La cara no puede ser más grande que el óvalo (muy estricto).
 const TOLERANCE_SIZE_MAX_FACTOR = 1.0; 
 
-// --- CONTROL DE FLUJO DE CAPTURA ---
 let isCountingDown = false; 
 let countdownInterval = null;
 let currentCount = 0;
 const INITIAL_COUNT = 3; 
-
-// --- Configuración e Inicialización ---
 
 Promise.all([
   faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
@@ -46,28 +37,49 @@ async function startVideo() {
   }
 }
 
-// 1. Manejo de Metadata (Esencial para dimensiones correctas en móviles)
 video.addEventListener('loadedmetadata', () => {
     video.width = video.videoWidth;
     video.height = video.videoHeight;
 });
 
-// 2. Manejo del Evento 'playing' (Estabilidad móvil)
 video.addEventListener('playing', () => {
     const canvas = faceapi.createCanvasFromMedia(video);
     document.body.append(canvas);
     
     const displaySize = { width: video.videoWidth, height: video.videoHeight };
     faceapi.matchDimensions(canvas, displaySize);
+    
+    calculateGuideDimensions();
 
     detectFaces(canvas, displaySize);
 });
 
+function calculateGuideDimensions() {
+    const guideComputedStyle = window.getComputedStyle(overlayGuide, '::after');
+    const guideDomWidth = parseFloat(guideComputedStyle.width);
 
-// 3. Bucle de Detección (requestAnimationFrame)
+    const videoDomWidth = video.getBoundingClientRect().width;
+    const videoSourceWidth = video.videoWidth;
+
+    const scaleFactor = videoSourceWidth / videoDomWidth;
+    
+    const guideWidthInSourcePixels = guideDomWidth * scaleFactor;
+    
+    guideWidthPercent = (guideWidthInSourcePixels / videoSourceWidth) * 100;
+
+    if (isNaN(guideWidthPercent) || guideWidthPercent === 0) {
+        guideWidthPercent = 35; 
+    }
+}
+
+
 async function detectFaces(canvas, displaySize) {
     
-    // Si la foto ya fue tomada, detener el proceso
+    if (guideWidthPercent === 0) {
+         requestAnimationFrame(() => detectFaces(canvas, displaySize));
+         return;
+    }
+
     if (photoContainer.classList.contains('show')) {
         requestAnimationFrame(() => detectFaces(canvas, displaySize));
         return;
@@ -80,9 +92,7 @@ async function detectFaces(canvas, displaySize) {
     
     const resizedDetections = faceapi.resizeResults(detections, displaySize);
     
-    // Lógica de Alineación y Control de Flujo CRÍTICO
     if (resizedDetections.length > 0) {
-        // CORRECCIÓN: Usar resizedDetections[0].detection
         const isAligned = checkAlignment(resizedDetections[0].detection, displaySize);
         
         if (isAligned) {
@@ -94,20 +104,16 @@ async function detectFaces(canvas, displaySize) {
         } else {
             overlayGuide.classList.remove('aligned');
             if (isCountingDown) {
-                // BUG FIX: Abortar la cuenta atrás si el rostro se sale del óvalo
                 abortCountdown(); 
             }
         }
     } else {
-        // No hay rostro detectado
         overlayGuide.classList.remove('aligned');
         if (isCountingDown) {
-            // BUG FIX: Abortar la cuenta atrás si el rostro desaparece
             abortCountdown(); 
         }
     }
 
-    // Dibujar en el canvas
     const context = canvas.getContext('2d');
     context.clearRect(0, 0, canvas.width, canvas.height);
     faceapi.draw.drawDetections(canvas, resizedDetections);
@@ -117,31 +123,26 @@ async function detectFaces(canvas, displaySize) {
     requestAnimationFrame(() => detectFaces(canvas, displaySize));
 }
 
-// 4. Función de Verificación de Alineación (Responsive y Estricta)
 function checkAlignment(detection, videoDimensions) {
     const box = detection.box;
     
-    // Transformar Coordenadas a PORCENTAJE (Base Responsive)
     const faceCenterX_Percent = ((box.x + box.width / 2) / videoDimensions.width) * 100;
     const faceCenterY_Percent = ((box.y + box.height / 2) / videoDimensions.height) * 100;
     const faceWidth_Percent = (box.width / videoDimensions.width) * 100;
     
-    // Corrección para el Volteo (Cámara Frontal)
     const isMirrored = true; 
     const finalFaceCenterX_Percent = isMirrored 
         ? (100 - faceCenterX_Percent) 
         : faceCenterX_Percent;
     
-    // Comprobar Centrado (Tolerancia: 5%)
     const diffX_Percent = Math.abs(finalFaceCenterX_Percent - GUIDE_CENTER_X);
     const diffY_Percent = Math.abs(faceCenterY_Percent - GUIDE_CENTER_Y);
     
     const isCentered = diffX_Percent < TOLERANCE_CENTER_PERCENT && 
                        diffY_Percent < TOLERANCE_CENTER_PERCENT;
     
-    // Comprobar Tamaño (Uso de los nuevos factores más estrictos)
-    const minSize = GUIDE_WIDTH_PERCENT * TOLERANCE_SIZE_MIN_FACTOR; 
-    const maxSize = GUIDE_WIDTH_PERCENT * TOLERANCE_SIZE_MAX_FACTOR; 
+    const minSize = guideWidthPercent * TOLERANCE_SIZE_MIN_FACTOR; 
+    const maxSize = guideWidthPercent * TOLERANCE_SIZE_MAX_FACTOR; 
 
     const isSized = faceWidth_Percent >= minSize && 
                     faceWidth_Percent <= maxSize;
@@ -149,7 +150,6 @@ function checkAlignment(detection, videoDimensions) {
     return isCentered && isSized;
 }
 
-// 5. Lógica de Cuenta Atrás
 function startCountdown() {
     currentCount = INITIAL_COUNT;
     
@@ -161,7 +161,6 @@ function startCountdown() {
             countdownMessage.innerText = currentCount;
             currentCount--;
         } else {
-            // FINALIZACIÓN EXITOSA: Limpiar y Capturar
             clearInterval(countdownInterval);
             countdownInterval = null;
             countdownMessage.classList.remove('visible');
@@ -172,21 +171,18 @@ function startCountdown() {
     }, 1000);
 }
 
-// 6. Abortar la Cuenta Atrás (Función de Interrupción)
 function abortCountdown() {
     if (countdownInterval) {
         clearInterval(countdownInterval);
         countdownInterval = null;
     }
     
-    // Resetear flags y elementos visuales
     isCountingDown = false;
     currentCount = 0;
     countdownMessage.classList.remove('visible');
     countdownMessage.innerText = '';
 }
 
-// 7. Tomar y Mostrar Foto
 function takePhoto() {
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = video.videoWidth;
@@ -203,7 +199,6 @@ function takePhoto() {
 function showPhoto(imageDataURL) {
     video.pause();
     
-    // Oculta los elementos de detección con una animación suave
     const detectionCanvas = document.querySelector('canvas');
     if (detectionCanvas) {
         detectionCanvas.style.transition = 'opacity 0.5s';
@@ -212,7 +207,6 @@ function showPhoto(imageDataURL) {
     overlayGuide.style.transition = 'opacity 0.5s';
     overlayGuide.style.opacity = '0';
     
-    // Muestra la foto en pantalla completa
     finalPhoto.src = imageDataURL;
     photoContainer.classList.add('show');
 }
