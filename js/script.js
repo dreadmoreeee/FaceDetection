@@ -13,7 +13,7 @@ let guideWidthPercent = 0;
 const TOLERANCE_CENTER_PERCENT = 5; 
 
 const TOLERANCE_SIZE_MIN_FACTOR = 0.9;  
-const TOLERANCE_SIZE_MAX_FACTOR = 1.0; 
+const TOLERANCE_SIZE_MAX_FACTOR = 1.2; 
 
 let isCountingDown = false; 
 let countdownInterval = null;
@@ -210,3 +210,4 @@ function showPhoto(imageDataURL) {
     finalPhoto.src = imageDataURL;
     photoContainer.classList.add('show');
 }
+
