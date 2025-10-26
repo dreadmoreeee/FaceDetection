@@ -7,11 +7,19 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
+  overflow: hidden; /* Evita barras de desplazamiento en móviles */
 }
 
-/* El canvas se superpone al video */
-canvas {
+/* El elemento de video y el canvas están posicionados absolutamente */
+#video, canvas {
   position: absolute;
+  /* El CSS no debe definir width/height fijos aquí; JavaScript lo hace para la cámara. */
+  /* Puedes usar max-width si necesitas limitar el tamaño en pantalla grande. */
+}
+
+canvas {
+  /* Asegura que el canvas de dibujo se superponga al video */
+  z-index: 5;
 }
 
 /* ---------------------------------------------------- */
@@ -19,77 +27,56 @@ canvas {
 /* ---------------------------------------------------- */
 
 #face-overlay-guide {
-  /* Asegura que cubra la pantalla y esté por encima del video/canvas */
+  /* Cubre la pantalla y se coloca sobre el video y el canvas */
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none; /* Permite interacciones debajo del overlay */
-  z-index: 10; /* Asegura que esté por encima del video/canvas */
+  pointer-events: none; /* Permite interacciones (como tocar el video) debajo del overlay */
+  z-index: 10; 
   background-color: transparent;
 }
 
-/* Creación del óvalo blanco mediante una sombra "invertida" (Máscara de corte) */
+/* El pseudo-elemento ::after crea la forma de la guía y la máscara */
 #face-overlay-guide::after {
   content: '';
   display: block;
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  
-  /* Usa box-shadow para crear la máscara. Cubre TODO excepto el óvalo central (hueco) */
-  /* El valor 9999px asegura que la sombra cubra toda la pantalla */
-  box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.7); 
-  
-  /* Definición y centrado del óvalo de corte */
-  border-radius: 50%; /* Inicialmente circular */
-  width: 300px; /* Ancho del óvalo */
-  height: 400px; /* Alto del óvalo */
-  
-  /* Centrar el óvalo */
   top: 50%;
   left: 50%;
+  
+  /* --- DIMENSIONES DE LA GUÍA (Coincidir con JS) --- */
+  width: 300px; 
+  height: 400px; 
+  
+  /* Centrar y darle forma ovalada */
   transform: translate(-50%, -50%); 
+  border-radius: 50%; 
   
-  background-color: transparent; 
-
+  /* Crea la máscara: box-shadow cubre todo menos el área del óvalo (corte) */
+  box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.7); 
+  
+  /* Borde por defecto (no alineado) y transiciones */
+  border: 4px solid rgba(255, 0, 0, 0.4); 
+  transition: all 0.3s ease-in-out;
 }
 
-/* --- EFECTOS DE ALINEACIÓN --- */
+/* --- EFECTOS DE ALINEACIÓN (Feedback Positivo) --- */
 
-/* Efecto por defecto cuando la cara NO está alineada (opcional: rojo sutil) */
-#face-overlay-guide::after {
-  /* Propiedades previas... */
-  border: 4px solid rgba(255, 0, 0, 0.2); /* Borde sutil */
-  transition: all 0.3s ease-in-out; /* Transición para la animación */
-}
-
-/* Efecto cuando la clase 'aligned' está activa (¡Rostro detectado y alineado!) */
+/* Se aplica cuando el rostro está centrado y dimensionado correctamente */
 #face-overlay-guide.aligned::after {
-  /* CAMBIO 1: Borde verde/azul sólido y animado */
+  /* Borde verde de éxito */
   border: 4px solid #00ff6a; 
-  /* CAMBIO 2: Sombra interior para darle un aspecto "encendido" */
-  box-shadow: 0 0 15px rgba(0, 255, 106, 0.8), 0 0 0 9999px rgba(255, 255, 255, 0.2); 
-  
-  /* Puedes añadir una animación de latido o brillo si lo deseas */
+  /* La máscara se vuelve más transparente (más sutil) */
+  box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.2); 
+  /* Animación de brillo/latido */
   animation: pulse-border 1.5s infinite;
 }
 
 /* Definición de la animación de "latido" */
 @keyframes pulse-border {
-  0% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1.02);
-    opacity: 0.8;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-  }
+  0% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.01); }
+  100% { transform: translate(-50%, -50%) scale(1); }
 }
