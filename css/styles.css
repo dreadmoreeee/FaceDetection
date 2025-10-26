@@ -1,4 +1,4 @@
-
+/* Base: Asegura que el contenido ocupe toda la pantalla y esté centrado */
 body {
   margin: 0;
   padding: 0;
@@ -8,8 +8,10 @@ body {
   justify-content: center;
   align-items: center;
   overflow: hidden; 
-  background-color: #f0f0f0; /* Color de fondo suave */
+  background-color: #f0f0f0;
 }
+
+/* El elemento de video y el canvas están posicionados absolutamente */
 #video, canvas {
   position: absolute;
   max-width: 100vw;
@@ -19,6 +21,10 @@ body {
 canvas {
   z-index: 5;
 }
+
+/* ---------------------------------------------------- */
+/* Estilos del Overlay de Alineación (Máscara de Cabeza) */
+/* ---------------------------------------------------- */
 
 #face-overlay-guide {
   position: absolute;
@@ -31,30 +37,37 @@ canvas {
   background-color: transparent;
 }
 
+/* El pseudo-elemento ::after crea la forma de la guía y la máscara */
 #face-overlay-guide::after {
   content: '';
   display: block;
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 250px; 
-  height: 350px;   
+  width: 200px; 
+  height: 300px; 
+  
   transform: translate(-50%, -50%); 
   border-radius: 50%; 
   box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.7); 
   border: 4px solid rgba(255, 0, 0, 0.4); 
   transition: all 0.3s ease-in-out;
 }
+
+/* --- EFECTOS DE ALINEACIÓN (Feedback Positivo) --- */
 #face-overlay-guide.aligned::after {
   border: 4px solid #00ff6a; 
   box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.2); 
   animation: pulse-border 1.5s infinite;
 }
+
 @keyframes pulse-border {
   0% { transform: translate(-50%, -50%) scale(1); }
   50% { transform: translate(-50%, -50%) scale(1.01); }
   100% { transform: translate(-50%, -50%) scale(1); }
 }
+
+/* --- ESTILOS DEL MENSAJE DE CUENTA ATRÁS --- */
 #countdown-message {
     position: absolute;
     top: 50%;
@@ -71,6 +84,8 @@ canvas {
 #countdown-message.visible {
     opacity: 1;
 }
+
+/* --- ESTILOS DE LA FOTO FINAL --- */
 #final-photo-container {
     position: fixed;
     top: 0;
@@ -86,11 +101,13 @@ canvas {
     visibility: hidden;
     transition: opacity 0.5s ease-in-out, visibility 0s linear 0.5s;
 }
+
 #final-photo-container.show {
     opacity: 1;
     visibility: visible;
     transition: opacity 0.5s ease-in-out;
 }
+
 #final-photo {
     max-width: 90%;
     max-height: 90%;
