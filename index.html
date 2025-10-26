@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam Preview</title>
+    <style>
+        /* CSS para estilizar la vista previa de la cámara */
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        /* El elemento <video> donde se mostrará el stream */
+        #camera-preview {
+            width: 100%; /* Ocupa todo el ancho disponible */
+            max-width: 800px; /* Ancho máximo para pantallas grandes */
+            height: auto;
+            border: 5px solid #007bff;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            background-color: #000; /* Fondo negro mientras carga */
+            transform: scaleX(-1); /* Opcional: Voltea la imagen para que sea como un espejo */
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Vista Previa de la Cámara 📸</h1>
+    <video id="camera-preview" autoplay playsinline></video>
+
+    <script>
+        // === JavaScript para acceder y mostrar el stream de la cámara ===
+
+        const videoElement = document.getElementById('camera-preview');
+
+        // Función principal para iniciar la cámara
+        async function startCamera() {
+            try {
+                // 1. Solicitamos acceso a la cámara de video
+                // La restricción 'video: true' le dice al navegador que solo necesitamos video.
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+
+                // 2. Asignamos el stream de la cámara al elemento <video>
+                videoElement.srcObject = stream;
+
+                // 3. Comenzamos a reproducir el video
+                // Aunque 'autoplay' está en el HTML, es una buena práctica llamar a play()
+                // especialmente después de asignar un nuevo 'srcObject'.
+                videoElement.play();
+
+                console.log("Cámara iniciada correctamente.");
+
+            } catch (error) {
+                // Manejamos cualquier error (por ejemplo, usuario deniega el permiso o no hay cámara)
+                console.error("Ocurrió un error al acceder a la cámara: ", error);
+
+                // Mostramos un mensaje amigable al usuario en caso de error
+                const errorMessage = document.createElement('p');
+                errorMessage.style.color = 'red';
+
+                if (error.name === 'NotAllowedError') {
+                    errorMessage.textContent = '❌ Permiso de cámara denegado. Por favor, otórgale permiso a la página.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage.textContent = '❌ No se encontró ninguna cámara en el dispositivo.';
+                } else {
+                    errorMessage.textContent = '❌ Error desconocido al acceder a la cámara. Consulta la consola.';
+                }
+
+                document.body.appendChild(errorMessage);
+            }
+        }
+
+        // Ejecutamos la función para iniciar la cámara cuando la página esté cargada
+        startCamera();
+
+    </script>
+</body>
+</html>
