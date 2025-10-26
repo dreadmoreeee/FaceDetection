@@ -3,10 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webcam con Detección de Rostro</title>
+    <title>Webcam con MediaPipe Face Detector</title>
     
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js"
+        crossorigin="anonymous"></script>
+
     <style>
-        /* === Estilos Generales === */
+        /* (CSS sin cambios importantes, manteniendo el contenedor y el volteo) */
         body {
             display: flex;
             flex-direction: column;
@@ -18,7 +21,6 @@
             font-family: sans-serif;
         }
 
-        /* === Contenedor de la Cámara y el Overlay === */
         .camera-container {
             position: relative;
             width: 100%;
@@ -29,7 +31,6 @@
             aspect-ratio: 4 / 3; 
         }
 
-        /* === Elemento de Video (Cámara) === */
         #camera-preview {
             width: 100%;
             height: 100%;
@@ -38,7 +39,7 @@
             transform: scaleX(-1); /* Volteo de espejo */
         }
 
-        /* === Overlay SVG (El hueco) === */
+        /* El SVG del overlay estático (guía del rostro) */
         #overlay-svg {
             position: absolute;
             top: 0;
@@ -48,7 +49,7 @@
             pointer-events: none; 
         }
 
-        /* === Canvas de Detección === */
+        /* El Canvas para dibujar la detección */
         #detection-canvas {
             position: absolute;
             top: 0;
@@ -56,15 +57,17 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
-            transform: scaleX(-1); 
+            /* IMPORTANTE: NO VOLTEAMOS EL CANVAS con MediaPipe
+               MediaPipe nos da coordenadas absolutas del video original.
+               ¡El volteo se hace manualmente en el código al dibujar!
+            */
         }
-
     </style>
 </head>
 <body>
 
-    <h1>Detección de Rostro en Vivo</h1>
-    <p id="loading-message" style="text-align: center;">Cargando modelos de IA... 🧠</p>
+    <h1>MediaPipe Detección de Rostro</h1>
+    <p id="loading-message" style="text-align: center;">Cargando modelos de MediaPipe... 🧠</p>
     
     <div class="camera-container">
         
@@ -92,29 +95,43 @@
 
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script type="module">
+        // Importamos las clases necesarias (Solo funciona con <script type="module">)
+        const { FaceDetector, FilesetResolver, RunningMode } = self.MediaPipeTasksVision;
 
-    <script>
         const videoElement = document.getElementById('camera-preview');
         const canvas = document.getElementById('detection-canvas');
         const loadingMessage = document.getElementById('loading-message');
-        
-        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
+        const context = canvas.getContext('2d');
 
-        // --- Cargar los Modelos (Modificado) ---
-        async function loadModels() {
-            try {
-                // Ahora 'faceapi' debería estar definido
-                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-                await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-                console.log("Modelos de face-api.js cargados correctamente.");
-                loadingMessage.innerText = "¡Modelos cargados! Iniciando cámara...";
-            } catch (error) {
-                console.error("Error al cargar los modelos de face-api.js: ", error);
-                loadingMessage.innerText = "❌ Error al cargar los modelos. Revisa la consola.";
-                // ** CAMBIO CLAVE 2: Lanzar el error para detener 'main' **
-                throw new Error("Fallo al cargar modelos");
-            }
+        let faceDetector;
+        let lastVideoTime = -1;
+        let runningMode = RunningMode.VIDEO;
+
+        // --- PASO 2: Inicializar y Configurar MediaPipe ---
+        async function initializeFaceDetector() {
+            loadingMessage.innerText = "Descargando modelos y WASM...";
+            
+            // Resolvemos la ruta a los archivos WASM
+            const vision = await FilesetResolver.forVisionTasks(
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+            );
+            
+            // PASO 3: Crear el detector con opciones
+            faceDetector = await FaceDetector.createFromOptions(
+                vision,
+                {
+                    baseOptions: {
+                        // ** DEBES CAMBIAR ESTO: Ruta a tu modelo descargado **
+                        modelAssetPath: "./models/face_detector.tflite" 
+                    },
+                    runningMode: runningMode,
+                    minDetectionConfidence: 0.7 
+                }
+            );
+
+            loadingMessage.innerText = "¡Detección lista! Iniciando cámara...";
+            console.log("MediaPipe Face Detector inicializado.");
         }
 
         // --- Iniciar la Cámara ---
@@ -122,64 +139,84 @@
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 videoElement.srcObject = stream;
-                // No llamamos a play() aquí, esperamos al evento 'play'
+                // Esperamos el evento 'loadeddata' para asegurar que el video está listo
+                videoElement.addEventListener('loadeddata', () => {
+                    // Una vez cargado, ajustamos el canvas al tamaño del video
+                    canvas.width = videoElement.videoWidth;
+                    canvas.height = videoElement.videoHeight;
+                    videoElement.play();
+                    requestAnimationFrame(detectAndDraw); // Empezamos el bucle
+                });
             } catch (error) {
                 console.error("Error al acceder a la cámara: ", error);
-                loadingMessage.innerText = "❌ Error al acceder a la cámara. Asegúrate de dar permisos.";
+                loadingMessage.innerText = "❌ Error: Asegúrate de tener cámara y otorgar permisos.";
             }
         }
 
-        // --- Loop de Detección y Dibujo ---
-        async function startFaceDetection() {
-            console.log("Iniciando detección de rostros...");
-            loadingMessage.style.display = 'none'; // Ocultamos el mensaje de carga
+        // --- PASO 4 y 5: Bucle de Detección y Dibujo (detectForVideo) ---
+        function detectAndDraw(now) {
+            if (!faceDetector || !videoElement.currentTime || !videoElement.videoWidth) {
+                // Si el detector no está listo o el video no tiene datos, intentamos de nuevo.
+                requestAnimationFrame(detectAndDraw);
+                return;
+            }
 
-            const displaySize = { width: videoElement.clientWidth, height: videoElement.clientHeight };
-            faceapi.matchDimensions(canvas, displaySize);
+            let results = null;
+            // Usamos el currentTime como el timestamp, como recomienda MediaPipe
+            if (videoElement.currentTime !== lastVideoTime) {
+                // Ejecutar la detección en modo VIDEO. Esto no bloquea si usa Web Worker
+                results = faceDetector.detectForVideo(videoElement, performance.now());
+                lastVideoTime = videoElement.currentTime;
+            }
 
-            setInterval(async () => {
-                try {
-                    const detections = await faceapi.detectAllFaces(
-                        videoElement, 
-                        new faceapi.TinyFaceDetectorOptions()
-                    ).withFaceLandmarks();
+            // Limpiamos el canvas antes de dibujar
+            context.clearRect(0, 0, canvas.width, canvas.height);
 
-                    const resizedDetections = faceapi.resizeResults(detections, displaySize);
-
-                    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-
-                    faceapi.draw.drawDetections(canvas, resizedDetections);
-                    faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
-
-                } catch (error) {
-                    // Este catch es para errores *durante* la detección, no en la carga
-                    console.error("Error en el loop de detección: ", error);
-                }
-            }, 100); 
-        }
-
-        // --- Función Principal (Modificada) ---
-        async function main() {
-            // ** CAMBIO CLAVE 3: Envolvemos 'main' en try...catch **
-            try {
-                // 1. Cargamos los modelos
-                await loadModels();
+            // Si hay resultados, dibujamos
+            if (results && results.detections.length > 0) {
+                loadingMessage.style.display = 'none'; // Ocultamos el mensaje
                 
-                // 2. Iniciamos la cámara (Solo si los modelos cargaron bien)
-                await startCamera();
+                for (const detection of results.detections) {
+                    const box = detection.boundingBox;
+                    
+                    // --- MANEJO DEL VOLTEO ---
+                    // El video está volteado (mirror). MediaPipe da coords del video original.
+                    // Para que el recuadro coincida con el video volteado:
+                    const mirroredX = canvas.width - box.originX - box.width;
+                    
+                    // Dibujamos el recuadro de detección (Bounding Box)
+                    context.strokeStyle = "#007bff";
+                    context.lineWidth = 3;
+                    context.strokeRect(
+                        mirroredX, // Posición X corregida
+                        box.originY, 
+                        box.width, 
+                        box.height
+                    );
 
-                videoElement.addEventListener('play', () => {
-                    startFaceDetection();
-                });
-
-            } catch (error) {
-                console.error("No se pudo iniciar la aplicación:", error.message);
+                    // Opcional: Dibujamos los 6 Keypoints
+                    context.fillStyle = "red";
+                    for (const keypoint of detection.keypoints) {
+                        const mirroredKeypointX = canvas.width - (keypoint.x * canvas.width);
+                        const keypointY = keypoint.y * canvas.height;
+                        context.beginPath();
+                        context.arc(mirroredKeypointX, keypointY, 3, 0, 2 * Math.PI);
+                        context.fill();
+                    }
+                }
             }
+
+            // Continuamos el bucle en el siguiente cuadro de animación
+            requestAnimationFrame(detectAndDraw);
         }
 
-        // ¡Ejecutamos la función principal!
-        main();
+        // --- Función Principal ---
+        async function main() {
+            await initializeFaceDetector();
+            await startCamera();
+        }
 
+        main();
     </script>
 </body>
 </html>
