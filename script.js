@@ -10,7 +10,7 @@ Promise.all([
   faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
 ]).then(startVideo)
 
-// 1. Función para iniciar la cámara (API Moderna)
+// Función para iniciar la cámara
 async function startVideo() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
@@ -21,39 +21,48 @@ async function startVideo() {
   }
 }
 
-// 2. Listener para detección (Evento 'playing' + Bucle rAF)
+// 1. EVENTO CORREGIDO: Usamos 'loadedmetadata' para obtener el tamaño REAL del video
+video.addEventListener('loadedmetadata', () => {
+    // 2. CORRECCIÓN: Definir el tamaño del elemento <video> al tamaño real
+    // Esto asegura que las dimensiones CSS y las dimensiones reales del video coincidan.
+    video.width = video.videoWidth;
+    video.height = video.videoHeight;
+});
+
+// Listener principal (Asegura que el video esté reproduciéndose)
 video.addEventListener('playing', () => {
     
-    // Inicialización del Canvas
+    // El canvas se crea SOLO cuando el video está reproduciéndose
     const canvas = faceapi.createCanvasFromMedia(video)
     document.body.append(canvas)
-    const displaySize = { width: video.width, height: video.height }
+
+    // CORRECCIÓN CLAVE: Usamos las dimensiones REALES del video (videoWidth/videoHeight)
+    const displaySize = { width: video.videoWidth, height: video.videoHeight }
     faceapi.matchDimensions(canvas, displaySize)
 
-    // Inicia el bucle de detección optimizado para móviles
+    // Inicia el bucle de detección optimizado
     detectFaces(canvas, displaySize);
 })
 
-// 3. Función de Bucle de Detección (Optimizada con requestAnimationFrame)
+// Función de Bucle de Detección (Optimizada con requestAnimationFrame)
 async function detectFaces(canvas, displaySize) {
     
-    // 1. Detección y Extracción
+    // Detección y Extracción
     const detections = await faceapi.detectAllFaces(
       video, 
       new faceapi.TinyFaceDetectorOptions()
     ).withFaceLandmarks().withFaceExpressions()
     
-    // 2. Escalar los resultados
+    // Escalar los resultados al tamaño REAL
     const resizedDetections = faceapi.resizeResults(detections, displaySize)
     
-    // 3. Limpiar y dibujar
+    // Limpiar y dibujar
     const context = canvas.getContext('2d');
     context.clearRect(0, 0, canvas.width, canvas.height)
     faceapi.draw.drawDetections(canvas, resizedDetections)
     faceapi.draw.drawFaceLandmarks(canvas, resizedDetections)
     faceapi.draw.drawFaceExpressions(canvas, resizedDetections)
 
-    // 4. Repetir el bucle
-    // requestAnimationFrame es mucho más eficiente que setInterval para video.
+    // Repetir el bucle
     requestAnimationFrame(() => detectFaces(canvas, displaySize));
 }
