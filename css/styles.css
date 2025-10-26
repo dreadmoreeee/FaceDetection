@@ -1,4 +1,4 @@
-/* Base: Asegura que el contenido ocupe toda la pantalla y esté centrado */
+
 body {
   margin: 0;
   padding: 0;
@@ -7,76 +7,93 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  overflow: hidden; /* Evita barras de desplazamiento en móviles */
+  overflow: hidden; 
+  background-color: #f0f0f0; /* Color de fondo suave */
 }
-
-/* El elemento de video y el canvas están posicionados absolutamente */
 #video, canvas {
   position: absolute;
-  /* El CSS no debe definir width/height fijos aquí; JavaScript lo hace para la cámara. */
-  /* Puedes usar max-width si necesitas limitar el tamaño en pantalla grande. */
+  max-width: 100vw;
+  max-height: 100vh;
 }
 
 canvas {
-  /* Asegura que el canvas de dibujo se superponga al video */
   z-index: 5;
 }
 
-/* ---------------------------------------------------- */
-/* Estilos del Overlay de Alineación (Máscara de Cabeza) */
-/* ---------------------------------------------------- */
-
 #face-overlay-guide {
-  /* Cubre la pantalla y se coloca sobre el video y el canvas */
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none; /* Permite interacciones (como tocar el video) debajo del overlay */
+  pointer-events: none; 
   z-index: 10; 
   background-color: transparent;
 }
 
-/* El pseudo-elemento ::after crea la forma de la guía y la máscara */
 #face-overlay-guide::after {
   content: '';
   display: block;
   position: absolute;
   top: 50%;
   left: 50%;
-  
-  /* --- DIMENSIONES DE LA GUÍA (Coincidir con JS) --- */
-  width: 300px; 
-  height: 400px; 
-  
-  /* Centrar y darle forma ovalada */
+  width: 250px; 
+  height: 350px;   
   transform: translate(-50%, -50%); 
   border-radius: 50%; 
-  
-  /* Crea la máscara: box-shadow cubre todo menos el área del óvalo (corte) */
   box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.7); 
-  
-  /* Borde por defecto (no alineado) y transiciones */
   border: 4px solid rgba(255, 0, 0, 0.4); 
   transition: all 0.3s ease-in-out;
 }
-
-/* --- EFECTOS DE ALINEACIÓN (Feedback Positivo) --- */
-
-/* Se aplica cuando el rostro está centrado y dimensionado correctamente */
 #face-overlay-guide.aligned::after {
-  /* Borde verde de éxito */
   border: 4px solid #00ff6a; 
-  /* La máscara se vuelve más transparente (más sutil) */
   box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.2); 
-  /* Animación de brillo/latido */
   animation: pulse-border 1.5s infinite;
 }
-
-/* Definición de la animación de "latido" */
 @keyframes pulse-border {
   0% { transform: translate(-50%, -50%) scale(1); }
   50% { transform: translate(-50%, -50%) scale(1.01); }
   100% { transform: translate(-50%, -50%) scale(1); }
+}
+#countdown-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 20;
+    font-size: 3em;
+    font-weight: bold;
+    color: #00ff6a;
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+#countdown-message.visible {
+    opacity: 1;
+}
+#final-photo-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.9);
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.5s ease-in-out, visibility 0s linear 0.5s;
+}
+#final-photo-container.show {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.5s ease-in-out;
+}
+#final-photo {
+    max-width: 90%;
+    max-height: 90%;
+    border: 5px solid white;
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.5);
 }
