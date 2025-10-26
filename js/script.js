@@ -6,11 +6,17 @@ const photoContainer = document.getElementById('final-photo-container');
 const finalPhoto = document.getElementById('final-photo');
 
 // --- CONSTANTES DE ALINEACIÓN ---
+// Ajustadas al óvalo de 200x300px (Ancho objetivo: 28%)
 const GUIDE_CENTER_X = 50;  
 const GUIDE_CENTER_Y = 50;  
 const GUIDE_WIDTH_PERCENT = 28; 
-const TOLERANCE_CENTER_PERCENT = 8; 
-const TOLERANCE_SIZE = 1.5;          
+
+// CAMBIO: Tolerancia de centrado reducida a 5% (más estricto)
+const TOLERANCE_CENTER_PERCENT = 5; 
+
+// CAMBIO: Tolerancia de tamaño (más estricto en el límite inferior)
+const TOLERANCE_SIZE_MIN = 1.1; // La cara debe ser al menos ~90% del óvalo (28% / 1.1 ≈ 25.4%)
+const TOLERANCE_SIZE_MAX = 1.2; // La cara puede ser máximo ~120% del óvalo
 
 // --- CONTROL DE FLUJO DE CAPTURA ---
 let isCountingDown = false; 
@@ -37,11 +43,13 @@ async function startVideo() {
   }
 }
 
+// 1. Manejo de Metadata (Esencial para dimensiones correctas en móviles)
 video.addEventListener('loadedmetadata', () => {
     video.width = video.videoWidth;
     video.height = video.videoHeight;
 });
 
+// 2. Manejo del Evento 'playing' (Estabilidad móvil)
 video.addEventListener('playing', () => {
     const canvas = faceapi.createCanvasFromMedia(video);
     document.body.append(canvas);
@@ -56,7 +64,7 @@ video.addEventListener('playing', () => {
 // 3. Bucle de Detección (requestAnimationFrame)
 async function detectFaces(canvas, displaySize) {
     
-    // Si la foto ya fue tomada, no hagas nada
+    // Si la foto ya fue tomada, detener el proceso
     if (photoContainer.classList.contains('show')) {
         requestAnimationFrame(() => detectFaces(canvas, displaySize));
         return;
@@ -83,7 +91,7 @@ async function detectFaces(canvas, displaySize) {
         } else {
             overlayGuide.classList.remove('aligned');
             if (isCountingDown) {
-                // BUG FIX: Abortar la cuenta atrás inmediatamente si el rostro se sale
+                // BUG FIX: Abortar la cuenta atrás si el rostro se sale del óvalo
                 abortCountdown(); 
             }
         }
@@ -106,36 +114,36 @@ async function detectFaces(canvas, displaySize) {
     requestAnimationFrame(() => detectFaces(canvas, displaySize));
 }
 
-// 4. Función de Verificación de Alineación
+// 4. Función de Verificación de Alineación (Responsive y Estricta)
 function checkAlignment(detection, videoDimensions) {
     const box = detection.box;
     
-    // Transformar Coordenadas a PORCENTAJE
+    // Transformar Coordenadas a PORCENTAJE (Base Responsive)
     const faceCenterX_Percent = ((box.x + box.width / 2) / videoDimensions.width) * 100;
     const faceCenterY_Percent = ((box.y + box.height / 2) / videoDimensions.height) * 100;
     const faceWidth_Percent = (box.width / videoDimensions.width) * 100;
     
-    // CORRECCIÓN RESPONSIVE PARA EL VOLTEO (asumiendo cámara frontal)
+    // Corrección para el Volteo (Cámara Frontal)
     const isMirrored = true; 
     const finalFaceCenterX_Percent = isMirrored 
         ? (100 - faceCenterX_Percent) 
         : faceCenterX_Percent;
     
-    // Comprobar Centrado (Tolerancia reducida)
+    // Comprobar Centrado (Tolerancia: 5%)
     const diffX_Percent = Math.abs(finalFaceCenterX_Percent - GUIDE_CENTER_X);
     const diffY_Percent = Math.abs(faceCenterY_Percent - GUIDE_CENTER_Y);
     
     const isCentered = diffX_Percent < TOLERANCE_CENTER_PERCENT && 
                        diffY_Percent < TOLERANCE_CENTER_PERCENT;
     
-    // Comprobar Tamaño
-    const isSized = faceWidth_Percent > (GUIDE_WIDTH_PERCENT / TOLERANCE_SIZE) && 
-                    faceWidth_Percent < (GUIDE_WIDTH_PERCENT * TOLERANCE_SIZE);
+    // Comprobar Tamaño (Uso de TOLERANCE_SIZE_MIN y MAX)
+    const isSized = faceWidth_Percent > (GUIDE_WIDTH_PERCENT / TOLERANCE_SIZE_MIN) && 
+                    faceWidth_Percent < (GUIDE_WIDTH_PERCENT * TOLERANCE_SIZE_MAX);
                     
     return isCentered && isSized;
 }
 
-// 5. Lógica de Cuenta Atrás y Captura
+// 5. Lógica de Cuenta Atrás
 function startCountdown() {
     currentCount = INITIAL_COUNT;
     
@@ -147,7 +155,7 @@ function startCountdown() {
             countdownMessage.innerText = currentCount;
             currentCount--;
         } else {
-            // FINALIZACIÓN EXITOSA
+            // FINALIZACIÓN EXITOSA: Limpiar y Capturar
             clearInterval(countdownInterval);
             countdownInterval = null;
             countdownMessage.classList.remove('visible');
@@ -158,7 +166,7 @@ function startCountdown() {
     }, 1000);
 }
 
-// 6. Abortar la Cuenta Atrás (Nueva Función)
+// 6. Abortar la Cuenta Atrás (Función de Interrupción)
 function abortCountdown() {
     if (countdownInterval) {
         clearInterval(countdownInterval);
@@ -170,8 +178,6 @@ function abortCountdown() {
     currentCount = 0;
     countdownMessage.classList.remove('visible');
     countdownMessage.innerText = '';
-    
-    // Opcional: Mostrar un mensaje de realineación si fuera necesario.
 }
 
 // 7. Tomar y Mostrar Foto
@@ -181,7 +187,6 @@ function takePhoto() {
     tempCanvas.height = video.videoHeight;
     const ctx = tempCanvas.getContext('2d');
     
-    // Dibuja el frame actual del video en el canvas temporal
     ctx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
     
     const imageDataURL = tempCanvas.toDataURL('image/jpeg');
@@ -190,11 +195,15 @@ function takePhoto() {
 }
 
 function showPhoto(imageDataURL) {
+    // Detiene el video
     video.pause();
     
     // Oculta los elementos de detección con una animación suave
-    document.querySelector('canvas').style.transition = 'opacity 0.5s';
-    document.querySelector('canvas').style.opacity = '0';
+    const detectionCanvas = document.querySelector('canvas');
+    if (detectionCanvas) {
+        detectionCanvas.style.transition = 'opacity 0.5s';
+        detectionCanvas.style.opacity = '0';
+    }
     overlayGuide.style.transition = 'opacity 0.5s';
     overlayGuide.style.opacity = '0';
     
@@ -202,9 +211,3 @@ function showPhoto(imageDataURL) {
     finalPhoto.src = imageDataURL;
     photoContainer.classList.add('show');
 }
-
-
-
-
-
-
