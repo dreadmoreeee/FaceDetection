@@ -1,147 +1,190 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Webcam con Detección Facial Universal</title>
-  <style>
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-      background-color: #f0f0f0;
-      font-family: sans-serif;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam con Detección de Rostro</title>
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
-    .camera-container {
-      position: relative;
-      width: 100%;
-      max-width: 800px;
-      aspect-ratio: 4 / 3;
-      overflow: hidden;
-      border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-      background-color: #000;
-    }
+    <style>
+        /* === Estilos Generales === */
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+        }
 
-    #camera-preview {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1); /* efecto espejo */
-      display: block;
-    }
+        /* === Contenedor de la Cámara y el Overlay === */
+        .camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            overflow: hidden;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            aspect-ratio: 4 / 3; 
+        }
 
-    #face-canvas,
-    #overlay-svg {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-  </style>
+        /* === Elemento de Video (Cámara) === */
+        #camera-preview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transform: scaleX(-1); /* Volteo de espejo */
+        }
+
+        /* === Overlay SVG (El hueco) === */
+        #overlay-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; 
+        }
+
+        /* PASO 3: Estilos para el Canvas de Detección 
+          Lo posicionamos exactamente sobre el video y el SVG
+        */
+        #detection-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            /* ¡CLAVE! Volteamos el canvas igual que el video */
+            transform: scaleX(-1); 
+        }
+
+    </style>
 </head>
 <body>
 
-  <h1>Coloca tu rostro en la silueta 👤</h1>
+    <h1>Detección de Rostro en Vivo</h1>
+    <p style="text-align: center;">(Espera unos segundos a que carguen los modelos)</p>
+    
+    <div class="camera-container">
+        
+        <video id="camera-preview" autoplay playsinline muted></video>
 
-  <div class="camera-container">
-    <video id="camera-preview" autoplay playsinline></video>
-    <canvas id="face-canvas"></canvas>
+        <svg id="overlay-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <path fill-rule="evenodd" 
+                  fill="rgba(255, 255, 255, 0.85)"
+                  d="M 0 0 H 100 V 100 H 0 Z 
+                     M 50 30 
+                     A 15 20 0 1 1 50 70 
+                     A 15 20 0 1 1 50 30 Z">
+            </path>
+            <path fill="none"
+                  stroke="#007bff"
+                  stroke-width="0.5"
+                  stroke-dasharray="2 2"
+                  d="M 50 30 
+                     A 15 20 0 1 1 50 70 
+                     A 15 20 0 1 1 50 30 Z">
+            </path>
+        </svg>
 
-    <!-- Overlay SVG de silueta -->
-    <svg id="overlay-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
-      <path fill-rule="evenodd" fill="rgba(255, 255, 255, 0.85)"
-        d="M 0 0 H 100 V 100 H 0 Z 
-           M 50 20 
-           Q 20 25, 25 50 
-           Q 25 75, 50 85 
-           Q 75 75, 75 50 
-           Q 80 25, 50 20 Z"></path>
-      <path fill="none" stroke="#007bff" stroke-width="0.5" stroke-dasharray="2 2"
-        d="M 50 20 
-           Q 20 25, 25 50 
-           Q 25 75, 50 85 
-           Q 75 75, 75 50 
-           Q 80 25, 50 20 Z"></path>
-    </svg>
-  </div>
+        <canvas id="detection-canvas"></canvas>
 
-  <!-- 🔹 Importar MediaPipe Face Detection -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    </div>
 
-  <script>
-    const videoElement = document.getElementById('camera-preview');
-    const canvasElement = document.getElementById('face-canvas');
-    const ctx = canvasElement.getContext('2d');
+    <script>
+        // === JavaScript (¡Grandes cambios aquí!) ===
 
-    async function startCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      videoElement.srcObject = stream;
+        const videoElement = document.getElementById('camera-preview');
+        const canvas = document.getElementById('detection-canvas');
+        
+        // URL de donde cargaremos los modelos de face-api.js
+        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
 
-      videoElement.onloadedmetadata = () => {
-        videoElement.play();
-        canvasElement.width = videoElement.videoWidth;
-        canvasElement.height = videoElement.videoHeight;
-        startFaceDetection();
-      };
-    }
-
-    function startFaceDetection() {
-      const faceDetection = new FaceDetection.FaceDetection({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
-      });
-
-      faceDetection.setOptions({
-        model: 'short', // modelo rápido (puedes usar 'full' para más precisión)
-        minDetectionConfidence: 0.6,
-      });
-
-      faceDetection.onResults(onResults);
-
-      const camera = new Camera(videoElement, {
-        onFrame: async () => {
-          await faceDetection.send({ image: videoElement });
-        },
-        width: 800,
-        height: 600
-      });
-      camera.start();
-    }
-
-    function onResults(results) {
-      ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-      if (results.detections && results.detections.length > 0) {
-        for (const detection of results.detections) {
-          const box = detection.boundingBox;
-          const mirroredX = canvasElement.width - box.xMin * canvasElement.width - box.width * canvasElement.width;
-
-          ctx.beginPath();
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = 'lime';
-          ctx.rect(
-            mirroredX,
-            box.yMin * canvasElement.height,
-            box.width * canvasElement.width,
-            box.height * canvasElement.height
-          );
-          ctx.stroke();
-
-          ctx.font = "16px sans-serif";
-          ctx.fillStyle = "lime";
-          ctx.fillText("Rostro detectado", mirroredX, box.yMin * canvasElement.height - 5);
+        // --- PASO 2: Cargar los Modelos ---
+        // Esta función carga los modelos necesarios para la detección
+        async function loadModels() {
+            try {
+                // Usaremos "Tiny Face Detector" que es el más rápido para web
+                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+                // También cargamos los "landmarks" (puntos de la cara) para dibujar mejor
+                await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+                console.log("Modelos de face-api.js cargados correctamente.");
+            } catch (error) {
+                console.error("Error al cargar los modelos de face-api.js: ", error);
+            }
         }
-      }
-    }
 
-    startCamera();
-  </script>
+        // --- Iniciar la Cámara (Modificado) ---
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoElement.srcObject = stream;
+                // No llamamos a play() aquí, esperamos al evento 'play'
+            } catch (error) {
+                console.error("Error al acceder a la cámara: ", error);
+                alert("Error al acceder a la cámara. Asegúrate de dar permisos.");
+            }
+        }
+
+        // --- PASO 4 y 5: Loop de Detección y Dibujo ---
+        async function startFaceDetection() {
+            console.log("Iniciando detección de rostros...");
+
+            // Sincroniza el tamaño del canvas con el tamaño real del video
+            const displaySize = { width: videoElement.clientWidth, height: videoElement.clientHeight };
+            faceapi.matchDimensions(canvas, displaySize);
+
+            // Creamos el loop que se ejecuta cada 100ms
+            setInterval(async () => {
+                try {
+                    // 1. Detectar caras
+                    const detections = await faceapi.detectAllFaces(
+                        videoElement, 
+                        new faceapi.TinyFaceDetectorOptions()
+                    ).withFaceLandmarks(); // Incluimos los puntos faciales
+
+                    // 2. Ajustar el tamaño de las detecciones al tamaño del canvas
+                    const resizedDetections = faceapi.resizeResults(detections, displaySize);
+
+                    // 3. Limpiar el canvas antes de dibujar de nuevo
+                    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+
+                    // 4. Dibujar las detecciones (el cuadro)
+                    faceapi.draw.drawDetections(canvas, resizedDetections);
+                    
+                    // 5. Dibujar los puntos de la cara (ojos, boca, etc.)
+                    faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+
+                } catch (error) {
+                    console.error("Error en el loop de detección: ", error);
+                }
+            }, 100); // Se ejecuta cada 100 milisegundos
+        }
+
+        // --- Función Principal para orquestar todo ---
+        async function main() {
+            // Primero cargamos los modelos
+            await loadModels();
+            
+            // Luego iniciamos la cámara
+            await startCamera();
+
+            // Añadimos un 'listener'. Cuando el video empiece a reproducirse...
+            videoElement.addEventListener('play', () => {
+                // ...iniciamos el loop de detección de rostros
+                startFaceDetection();
+            });
+        }
+
+        // ¡Ejecutamos la función principal!
+        main();
+
+    </script>
 </body>
 </html>
