@@ -15,7 +15,7 @@ const GUIDE_WIDTH_PERCENT = 28;
 const TOLERANCE_CENTER_PERCENT = 5; 
 
 // Tolerancia de tamaño (flexible abajo, estricta arriba para evitar hombros)
-const TOLERANCE_SIZE_MIN_FACTOR = 0.8;  // Permite hasta 70% del ancho del óvalo (usuario cerca)
+const TOLERANCE_SIZE_MIN_FACTOR = 0.7;  // Permite hasta 70% del ancho del óvalo (usuario cerca)
 const TOLERANCE_SIZE_MAX_FACTOR = 1.05; // Máximo 105% del ancho del óvalo (impide usuario lejos)
 
 // --- CONTROL DE FLUJO DE CAPTURA ---
@@ -107,8 +107,8 @@ async function detectFaces(canvas, displaySize) {
     const context = canvas.getContext('2d');
     context.clearRect(0, 0, canvas.width, canvas.height);
     faceapi.draw.drawDetections(canvas, resizedDetections);
-    faceapi.draw.drawFaceLandmarks(canvas, resizedDetections); // CORREGIDO
-    faceapi.draw.drawFaceExpressions(canvas, resizedDetections); // CORREGIDO
+    faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+    faceapi.draw.drawFaceExpressions(canvas, resizedDetections);
 
     requestAnimationFrame(() => detectFaces(canvas, displaySize));
 }
