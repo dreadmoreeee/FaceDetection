@@ -6,7 +6,6 @@ const photoContainer = document.getElementById('final-photo-container');
 const finalPhoto = document.getElementById('final-photo');
 
 // --- CONSTANTES DE ALINEACIÓN ---
-// Ajustadas al nuevo tamaño de 200x300px
 const GUIDE_CENTER_X = 50;  
 const GUIDE_CENTER_Y = 50;  
 const GUIDE_WIDTH_PERCENT = 28; 
@@ -203,5 +202,6 @@ function showPhoto(imageDataURL) {
     finalPhoto.src = imageDataURL;
     photoContainer.classList.add('show');
 }
+
 
 
