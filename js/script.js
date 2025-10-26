@@ -1,10 +1,15 @@
 const video = document.getElementById('video');
 const MODEL_URL = '/models';
 const overlayGuide = document.getElementById('face-overlay-guide');
-const countdownMessage = document.getElementById('countdown-message');
+
+// NUEVOS ELEMENTOS DEL DOM
+const instructionBox = document.getElementById('instruction-box');
+const instructionText = document.getElementById('instruction-text');
+
 const photoContainer = document.getElementById('final-photo-container');
 const finalPhoto = document.getElementById('final-photo');
 
+// --- CONSTANTES DE ALINEACIÓN ---
 const GUIDE_CENTER_X = 50;  
 const GUIDE_CENTER_Y = 50;  
 
@@ -14,11 +19,15 @@ const TOLERANCE_CENTER_PERCENT = 5;
 
 const TOLERANCE_SIZE_MIN_FACTOR = 0.9;  
 const TOLERANCE_SIZE_MAX_FACTOR = 1.2; 
+const PROXIMITY_CENTER_TOLERANCE = 15; // Límite para el mensaje "Centra tu rostro"
 
+// --- CONTROL DE FLUJO DE CAPTURA ---
 let isCountingDown = false; 
 let countdownInterval = null;
 let currentCount = 0;
 const INITIAL_COUNT = 3; 
+
+// --- Configuración e Inicialización ---
 
 Promise.all([
   faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
@@ -92,8 +101,12 @@ async function detectFaces(canvas, displaySize) {
     
     const resizedDetections = faceapi.resizeResults(detections, displaySize);
     
+    let isAligned = false;
+    
     if (resizedDetections.length > 0) {
-        const isAligned = checkAlignment(resizedDetections[0].detection, displaySize);
+        // Obtenemos el feedback específico de alineación
+        const alignmentFeedback = checkAlignment(resizedDetections[0].detection, displaySize);
+        isAligned = alignmentFeedback.isAligned;
         
         if (isAligned) {
             overlayGuide.classList.add('aligned');
@@ -106,12 +119,18 @@ async function detectFaces(canvas, displaySize) {
             if (isCountingDown) {
                 abortCountdown(); 
             }
+            // NUEVO: Mostrar mensaje de guía cuando NO está alineado
+            if (!isCountingDown) {
+                showInstruction(alignmentFeedback.message);
+            }
         }
     } else {
+        // No hay rostro detectado
         overlayGuide.classList.remove('aligned');
         if (isCountingDown) {
             abortCountdown(); 
         }
+        showInstruction("Acerca tu rostro al centro del óvalo.");
     }
 
     const context = canvas.getContext('2d');
@@ -125,6 +144,7 @@ async function detectFaces(canvas, displaySize) {
 
 function checkAlignment(detection, videoDimensions) {
     const box = detection.box;
+    let message = "Centra tu rostro en el óvalo.";
     
     const faceCenterX_Percent = ((box.x + box.width / 2) / videoDimensions.width) * 100;
     const faceCenterY_Percent = ((box.y + box.height / 2) / videoDimensions.height) * 100;
@@ -135,36 +155,63 @@ function checkAlignment(detection, videoDimensions) {
         ? (100 - faceCenterX_Percent) 
         : faceCenterX_Percent;
     
+    // Comprobar Centrado
     const diffX_Percent = Math.abs(finalFaceCenterX_Percent - GUIDE_CENTER_X);
     const diffY_Percent = Math.abs(faceCenterY_Percent - GUIDE_CENTER_Y);
     
     const isCentered = diffX_Percent < TOLERANCE_CENTER_PERCENT && 
                        diffY_Percent < TOLERANCE_CENTER_PERCENT;
     
+    // Comprobar Tamaño
     const minSize = guideWidthPercent * TOLERANCE_SIZE_MIN_FACTOR; 
     const maxSize = guideWidthPercent * TOLERANCE_SIZE_MAX_FACTOR; 
 
     const isSized = faceWidth_Percent >= minSize && 
                     faceWidth_Percent <= maxSize;
-                    
-    return isCentered && isSized;
+    
+    // Lógica de Mensaje de Guía
+    if (!isCentered && (diffX_Percent > PROXIMITY_CENTER_TOLERANCE || diffY_Percent > PROXIMITY_CENTER_TOLERANCE)) {
+        message = "Centra tu rostro en el óvalo.";
+    } else if (!isSized) {
+        if (faceWidth_Percent < minSize) {
+            message = "Acércate a la cámara para llenar el óvalo.";
+        } else if (faceWidth_Percent > maxSize) {
+            message = "Aléjate de la cámara, tu rostro es demasiado grande.";
+        }
+    } else if (!isCentered) {
+         // Si el tamaño es correcto pero el centrado está ligeramente desviado
+         message = "Mueve tu rostro ligeramente para centrarlo.";
+    } else {
+         message = "¡Rostro alineado! Preparado para la captura.";
+    }
+
+    return { isAligned: isCentered && isSized, message: message };
+}
+
+function showInstruction(text, isSuccess = false) {
+    instructionText.innerText = text;
+    if (isSuccess) {
+        instructionBox.classList.add('success');
+    } else {
+        instructionBox.classList.remove('success');
+    }
 }
 
 function startCountdown() {
     currentCount = INITIAL_COUNT;
     
-    countdownMessage.innerText = "¡No te muevas!";
-    countdownMessage.classList.add('visible');
+    showInstruction("¡No te muevas!", true);
 
     countdownInterval = setInterval(() => {
         if (currentCount > 0) {
-            countdownMessage.innerText = currentCount;
+            showInstruction(currentCount.toString(), true);
             currentCount--;
         } else {
             clearInterval(countdownInterval);
             countdownInterval = null;
-            countdownMessage.classList.remove('visible');
-            countdownMessage.innerText = '';
+            
+            // Ocultar mensaje antes de mostrar la foto
+            instructionBox.style.opacity = '0';
             
             takePhoto();
         }
@@ -179,8 +226,9 @@ function abortCountdown() {
     
     isCountingDown = false;
     currentCount = 0;
-    countdownMessage.classList.remove('visible');
-    countdownMessage.innerText = '';
+    
+    instructionBox.style.opacity = '1';
+    showInstruction("¡Te moviste! Vuelve a centrar tu rostro.", false);
 }
 
 function takePhoto() {
@@ -207,7 +255,8 @@ function showPhoto(imageDataURL) {
     overlayGuide.style.transition = 'opacity 0.5s';
     overlayGuide.style.opacity = '0';
     
+    instructionBox.style.display = 'none'; // Ocultar la caja de instrucciones
+
     finalPhoto.src = imageDataURL;
     photoContainer.classList.add('show');
 }
-
