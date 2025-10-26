@@ -18,7 +18,7 @@ let guideWidthPercent = 0;
 const TOLERANCE_CENTER_PERCENT = 5; 
 
 const TOLERANCE_SIZE_MIN_FACTOR = 0.9;  
-const TOLERANCE_SIZE_MAX_FACTOR = 1.2; 
+const TOLERANCE_SIZE_MAX_FACTOR = 1.3; 
 const PROXIMITY_CENTER_TOLERANCE = 15; // Límite para el mensaje "Centra tu rostro"
 
 // --- CONTROL DE FLUJO DE CAPTURA ---
@@ -260,3 +260,4 @@ function showPhoto(imageDataURL) {
     finalPhoto.src = imageDataURL;
     photoContainer.classList.add('show');
 }
+
