@@ -55,4 +55,41 @@ canvas {
   transform: translate(-50%, -50%); 
   
   background-color: transparent; 
+
+}
+
+/* --- EFECTOS DE ALINEACIÓN --- */
+
+/* Efecto por defecto cuando la cara NO está alineada (opcional: rojo sutil) */
+#face-overlay-guide::after {
+  /* Propiedades previas... */
+  border: 4px solid rgba(255, 0, 0, 0.2); /* Borde sutil */
+  transition: all 0.3s ease-in-out; /* Transición para la animación */
+}
+
+/* Efecto cuando la clase 'aligned' está activa (¡Rostro detectado y alineado!) */
+#face-overlay-guide.aligned::after {
+  /* CAMBIO 1: Borde verde/azul sólido y animado */
+  border: 4px solid #00ff6a; 
+  /* CAMBIO 2: Sombra interior para darle un aspecto "encendido" */
+  box-shadow: 0 0 15px rgba(0, 255, 106, 0.8), 0 0 0 9999px rgba(255, 255, 255, 0.2); 
+  
+  /* Puedes añadir una animación de latido o brillo si lo deseas */
+  animation: pulse-border 1.5s infinite;
+}
+
+/* Definición de la animación de "latido" */
+@keyframes pulse-border {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.02);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
 }
