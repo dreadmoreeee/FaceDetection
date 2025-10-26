@@ -6,13 +6,17 @@ const photoContainer = document.getElementById('final-photo-container');
 const finalPhoto = document.getElementById('final-photo');
 
 // --- CONSTANTES DE ALINEACIÓN ---
+// Ajustadas al óvalo de 200x300px (Ancho objetivo: 28%)
 const GUIDE_CENTER_X = 50;  
 const GUIDE_CENTER_Y = 50;  
 const GUIDE_WIDTH_PERCENT = 28; 
 
+// Tolerancia de centrado estricta: 5%
 const TOLERANCE_CENTER_PERCENT = 5; 
-const TOLERANCE_SIZE_MIN_FACTOR = 0.8;  
-const TOLERANCE_SIZE_MAX_FACTOR = 1.05; 
+
+// Tolerancia de tamaño (flexible abajo, estricta arriba para evitar hombros)
+const TOLERANCE_SIZE_MIN_FACTOR = 0.8;  // Permite hasta 70% del ancho del óvalo (usuario cerca)
+const TOLERANCE_SIZE_MAX_FACTOR = 1.05; // Máximo 105% del ancho del óvalo (impide usuario lejos)
 
 // --- CONTROL DE FLUJO DE CAPTURA ---
 let isCountingDown = false; 
@@ -60,6 +64,7 @@ video.addEventListener('playing', () => {
 // 3. Bucle de Detección (requestAnimationFrame)
 async function detectFaces(canvas, displaySize) {
     
+    // Si la foto ya fue tomada, detener el proceso
     if (photoContainer.classList.contains('show')) {
         requestAnimationFrame(() => detectFaces(canvas, displaySize));
         return;
@@ -85,12 +90,15 @@ async function detectFaces(canvas, displaySize) {
         } else {
             overlayGuide.classList.remove('aligned');
             if (isCountingDown) {
+                // BUG FIX: Abortar la cuenta atrás si el rostro se sale del óvalo
                 abortCountdown(); 
             }
         }
     } else {
+        // No hay rostro detectado
         overlayGuide.classList.remove('aligned');
         if (isCountingDown) {
+            // BUG FIX: Abortar la cuenta atrás si el rostro desaparece
             abortCountdown(); 
         }
     }
@@ -99,8 +107,8 @@ async function detectFaces(canvas, displaySize) {
     const context = canvas.getContext('2d');
     context.clearRect(0, 0, canvas.width, canvas.height);
     faceapi.draw.drawDetections(canvas, resizedDetections);
-    faceapi.draw.drawFaceLandmarks(canvas, resizedDetection);
-    faceapi.draw.drawFaceExpressions(canvas, resizedDetection);
+    faceapi.draw.drawFaceLandmarks(canvas, resizedDetections); // CORREGIDO
+    faceapi.draw.drawFaceExpressions(canvas, resizedDetections); // CORREGIDO
 
     requestAnimationFrame(() => detectFaces(canvas, displaySize));
 }
@@ -128,9 +136,7 @@ function checkAlignment(detection, videoDimensions) {
                        diffY_Percent < TOLERANCE_CENTER_PERCENT;
     
     // Comprobar Tamaño (Uso de los nuevos factores)
-    // Límite Mínimo (Permite cara más pequeña, 70% del óvalo)
     const minSize = GUIDE_WIDTH_PERCENT * TOLERANCE_SIZE_MIN_FACTOR; 
-    // Límite Máximo (Impide cara más grande, 105% del óvalo)
     const maxSize = GUIDE_WIDTH_PERCENT * TOLERANCE_SIZE_MAX_FACTOR; 
 
     const isSized = faceWidth_Percent >= minSize && 
@@ -206,5 +212,3 @@ function showPhoto(imageDataURL) {
     finalPhoto.src = imageDataURL;
     photoContainer.classList.add('show');
 }
-
-
