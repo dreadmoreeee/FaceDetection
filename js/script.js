@@ -6,17 +6,20 @@ const photoContainer = document.getElementById('final-photo-container');
 const finalPhoto = document.getElementById('final-photo');
 
 // --- CONSTANTES DE ALINEACIÓN ---
-// Ajustadas al óvalo de 200x300px (Ancho objetivo: 28%)
 const GUIDE_CENTER_X = 50;  
 const GUIDE_CENTER_Y = 50;  
-const GUIDE_WIDTH_PERCENT = 28; 
+// CAMBIO CRÍTICO: Aumentamos el tamaño objetivo a 40% del ancho del video.
+// Esto permite al usuario acercarse más a la cámara.
+const GUIDE_WIDTH_PERCENT = 40; 
 
 // Tolerancia de centrado estricta: 5%
 const TOLERANCE_CENTER_PERCENT = 5; 
 
-// Tolerancia de tamaño (flexible abajo, estricta arriba para evitar hombros)
-const TOLERANCE_SIZE_MIN_FACTOR = 2;  // Permite hasta 70% del ancho del óvalo (usuario cerca)
-const TOLERANCE_SIZE_MAX_FACTOR = 2; // Máximo 105% del ancho del óvalo (impide usuario lejos)
+// CAMBIOS DE LÍMITES DE TAMAÑO:
+// Límite MÍNIMO: 0.9. La cara debe ser al menos el 90% del óvalo (más estricto).
+const TOLERANCE_SIZE_MIN_FACTOR = 0.9;  
+// Límite MÁXIMO: 1.0. La cara no puede ser más grande que el óvalo (muy estricto).
+const TOLERANCE_SIZE_MAX_FACTOR = 1.0; 
 
 // --- CONTROL DE FLUJO DE CAPTURA ---
 let isCountingDown = false; 
@@ -79,6 +82,7 @@ async function detectFaces(canvas, displaySize) {
     
     // Lógica de Alineación y Control de Flujo CRÍTICO
     if (resizedDetections.length > 0) {
+        // CORRECCIÓN: Usar resizedDetections[0].detection
         const isAligned = checkAlignment(resizedDetections[0].detection, displaySize);
         
         if (isAligned) {
@@ -135,7 +139,7 @@ function checkAlignment(detection, videoDimensions) {
     const isCentered = diffX_Percent < TOLERANCE_CENTER_PERCENT && 
                        diffY_Percent < TOLERANCE_CENTER_PERCENT;
     
-    // Comprobar Tamaño (Uso de los nuevos factores)
+    // Comprobar Tamaño (Uso de los nuevos factores más estrictos)
     const minSize = GUIDE_WIDTH_PERCENT * TOLERANCE_SIZE_MIN_FACTOR; 
     const maxSize = GUIDE_WIDTH_PERCENT * TOLERANCE_SIZE_MAX_FACTOR; 
 
@@ -212,7 +216,3 @@ function showPhoto(imageDataURL) {
     finalPhoto.src = imageDataURL;
     photoContainer.classList.add('show');
 }
-
-
-
-
