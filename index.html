@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webcam con Overlay de Óvalo</title>
+    <title>Webcam con Overlay de Silueta</title>
     <style>
         /* === Estilos Generales === */
         body {
@@ -18,99 +18,88 @@
         }
 
         /* === Contenedor de la Cámara y el Overlay === */
-        /* Usamos position: relative para que el overlay se posicione relativo a él */
         .camera-container {
             position: relative;
             width: 100%;
-            max-width: 800px; /* Mantiene el ancho máximo */
-            /* La altura se ajustará automáticamente con el video */
-            overflow: hidden; /* Importante para contener el video */
+            max-width: 800px;
+            overflow: hidden;
             border-radius: 10px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            /* Mantenemos el aspect-ratio para que el SVG no se deforme */
+            /* 4:3 es común en webcams, ajusta si es necesario */
+            aspect-ratio: 4 / 3; 
         }
 
         /* === Elemento de Video (Cámara) === */
         #camera-preview {
             width: 100%;
-            display: block; /* Elimina espacio extra debajo del video */
+            height: 100%;
+            object-fit: cover; /* Asegura que el video llene el contenedor */
+            display: block;
             transform: scaleX(-1); /* Reflejo opcional */
         }
 
-        /* === El Overlay (Máscara) === */
-        #overlay {
+        /* === El Overlay SVG (Reemplaza al div) === */
+        #overlay-svg {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            /* Utilizamos 'pointer-events: none' para permitir al usuario interactuar */
-            /* si hubiera botones debajo del overlay, pero no con el overlay en sí. */
-            pointer-events: none;
-        }
-
-        /* === El Estilo de Máscara Oscura y Óvalo Perforado === */
-        /* === El Estilo de Máscara Oscura y Óvalo Perforado === */
-        .mask-frame {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            /* Esto es el truco: una sombra gigante y desenfocada que cubre todo el elemento */
-            box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.85); /* Fondo blanco semitransparente */
-            /* Propiedad para darle forma de óvalo al "agujero" */
-            border-radius: 50%; 
-
-            /* *************************************************** */
-            /* ** CAMBIOS CLAVE: Óvalo más ajustado al rostro ** */
-            /* *************************************************** */
-            
-            /* Ancho más estrecho: 35% del contenedor */
-            width: 35%; 
-            /* Altura mayor: 80% del contenedor */
-            height: 80%;
-            
-            /* Recalculamos la posición para centrarlo: */
-            
-            /* TOP: (100% - 80% de altura) / 2 = 10% */
-            top: 10%; 
-            /* LEFT: (100% - 35% de ancho) / 2 = 32.5% */
-            left: 32.5%; 
-
-            /* Estilo para el borde del óvalo */
-            border: 3px dashed #007bff; /* Borde punteado azul */
-            box-sizing: border-box; /* Incluye el borde dentro de las dimensiones */
+            pointer-events: none; /* Permite interactuar con lo que esté debajo (si hubiera) */
         }
 
     </style>
 </head>
 <body>
 
-    <h1>Coloca tu rostro en el óvalo 👤</h1>
+    <h1>Coloca tu rostro en la silueta 👤</h1>
     
     <div class="camera-container">
+        
         <video id="camera-preview" autoplay playsinline></video>
 
-        <div id="overlay">
-            <div class="mask-frame"></div>
-        </div>
+        <svg id="overlay-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+            
+            <path fill-rule="evenodd" 
+                  fill="rgba(255, 255, 255, 0.85)"
+                  d="M 0 0 H 100 V 100 H 0 Z 
+                     M 50 18 
+                     A 16 16 0 1 0 50 50 
+                     A 16 16 0 1 0 50 18 Z 
+                     M 25 90 
+                     L 25 70 
+                     C 25 55, 75 55, 75 70 
+                     L 75 90 Z">
+            </path>
+            
+            <path fill="none"
+                  stroke="#007bff"
+                  stroke-width="0.5"
+                  stroke-dasharray="2 2"
+                  d="M 50 18 
+                     A 16 16 0 1 0 50 50 
+                     A 16 16 0 1 0 50 18 Z 
+                     M 25 90 
+                     L 25 70 
+                     C 25 55, 75 55, 75 70 
+                     L 75 90 Z">
+            </path>
+        </svg>
+
     </div>
 
     <script>
-        // === JavaScript: Mantenemos el mismo código para iniciar la cámara ===
-
+        // === JavaScript (SIN CAMBIOS) ===
         const videoElement = document.getElementById('camera-preview');
-
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 videoElement.srcObject = stream;
                 videoElement.play();
-                console.log("Cámara iniciada con overlay.");
-
+                console.log("Cámara iniciada con overlay SVG.");
             } catch (error) {
                 console.error("Ocurrió un error al acceder a la cámara: ", error);
-                
                 const container = document.querySelector('.camera-container');
                 const errorMessage = document.createElement('p');
                 errorMessage.style.color = 'red';
@@ -118,10 +107,7 @@
                 container.parentNode.insertBefore(errorMessage, container.nextSibling); 
             }
         }
-
-        // Ejecutamos la función
         startCamera();
-
     </script>
 </body>
 </html>
