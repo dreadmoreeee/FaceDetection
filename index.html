@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webcam Preview</title>
+    <title>Webcam con Overlay de Óvalo</title>
     <style>
-        /* CSS para estilizar la vista previa de la cámara */
+        /* === Estilos Generales === */
         body {
             display: flex;
             flex-direction: column;
@@ -17,71 +17,107 @@
             font-family: sans-serif;
         }
 
-        h1 {
-            color: #333;
-        }
-
-        /* El elemento <video> donde se mostrará el stream */
-        #camera-preview {
-            width: 100%; /* Ocupa todo el ancho disponible */
-            max-width: 800px; /* Ancho máximo para pantallas grandes */
-            height: auto;
-            border: 5px solid #007bff;
+        /* === Contenedor de la Cámara y el Overlay === */
+        /* Usamos position: relative para que el overlay se posicione relativo a él */
+        .camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px; /* Mantiene el ancho máximo */
+            /* La altura se ajustará automáticamente con el video */
+            overflow: hidden; /* Importante para contener el video */
             border-radius: 10px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            background-color: #000; /* Fondo negro mientras carga */
-            transform: scaleX(-1); /* Opcional: Voltea la imagen para que sea como un espejo */
         }
+
+        /* === Elemento de Video (Cámara) === */
+        #camera-preview {
+            width: 100%;
+            display: block; /* Elimina espacio extra debajo del video */
+            transform: scaleX(-1); /* Reflejo opcional */
+        }
+
+        /* === El Overlay (Máscara) === */
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* Utilizamos 'pointer-events: none' para permitir al usuario interactuar */
+            /* si hubiera botones debajo del overlay, pero no con el overlay en sí. */
+            pointer-events: none;
+        }
+
+        /* === El Estilo de Máscara Oscura y Óvalo Perforado === */
+        .mask-frame {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* Esto es el truco: una sombra gigante y desenfocada que cubre todo el elemento */
+            box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.85); /* Fondo blanco semitransparente */
+            /* Propiedad para darle forma de óvalo al "agujero" */
+            border-radius: 50%; 
+
+            /* ********************************************** */
+            /* ** CAMBIO CLAVE PARA HACER EL ÓVALO VERTICAL ** */
+            /* ********************************************** */
+            
+            /* Reducimos el ancho a 40% (antes 50%) */
+            width: 40%; 
+            /* Mantenemos o aumentamos la altura a 75% */
+            height: 75%;
+            
+            /* Recalculamos el centrado */
+            /* TOP: (100% - 75% de altura) / 2 = 12.5% */
+            top: 12.5%; 
+            /* LEFT: (100% - 40% de ancho) / 2 = 30% */
+            left: 30%; 
+
+            /* Estilo para el borde del óvalo */
+            border: 3px dashed #007bff; /* Borde punteado azul */
+            box-sizing: border-box; /* Incluye el borde dentro de las dimensiones */
+        }
+
     </style>
 </head>
 <body>
 
-    <h1>Vista Previa de la Cámara 📸</h1>
-    <video id="camera-preview" autoplay playsinline></video>
+    <h1>Coloca tu rostro en el óvalo 👤</h1>
+    
+    <div class="camera-container">
+        <video id="camera-preview" autoplay playsinline></video>
+
+        <div id="overlay">
+            <div class="mask-frame"></div>
+        </div>
+    </div>
 
     <script>
-        // === JavaScript para acceder y mostrar el stream de la cámara ===
+        // === JavaScript: Mantenemos el mismo código para iniciar la cámara ===
 
         const videoElement = document.getElementById('camera-preview');
 
-        // Función principal para iniciar la cámara
         async function startCamera() {
             try {
-                // 1. Solicitamos acceso a la cámara de video
-                // La restricción 'video: true' le dice al navegador que solo necesitamos video.
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-
-                // 2. Asignamos el stream de la cámara al elemento <video>
                 videoElement.srcObject = stream;
-
-                // 3. Comenzamos a reproducir el video
-                // Aunque 'autoplay' está en el HTML, es una buena práctica llamar a play()
-                // especialmente después de asignar un nuevo 'srcObject'.
                 videoElement.play();
-
-                console.log("Cámara iniciada correctamente.");
+                console.log("Cámara iniciada con overlay.");
 
             } catch (error) {
-                // Manejamos cualquier error (por ejemplo, usuario deniega el permiso o no hay cámara)
                 console.error("Ocurrió un error al acceder a la cámara: ", error);
-
-                // Mostramos un mensaje amigable al usuario en caso de error
+                
+                const container = document.querySelector('.camera-container');
                 const errorMessage = document.createElement('p');
                 errorMessage.style.color = 'red';
-
-                if (error.name === 'NotAllowedError') {
-                    errorMessage.textContent = '❌ Permiso de cámara denegado. Por favor, otórgale permiso a la página.';
-                } else if (error.name === 'NotFoundError') {
-                    errorMessage.textContent = '❌ No se encontró ninguna cámara en el dispositivo.';
-                } else {
-                    errorMessage.textContent = '❌ Error desconocido al acceder a la cámara. Consulta la consola.';
-                }
-
-                document.body.appendChild(errorMessage);
+                errorMessage.textContent = '❌ Error: Asegúrate de tener cámara y otorgar permisos.';
+                container.parentNode.insertBefore(errorMessage, container.nextSibling); 
             }
         }
 
-        // Ejecutamos la función para iniciar la cámara cuando la página esté cargada
+        // Ejecutamos la función
         startCamera();
 
     </script>
