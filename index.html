@@ -1,217 +1,29 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webcam con MediaPipe Face Detector</title>
-    
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Face Detection</title>
+  <script defer src="face-api.min.js"></script>
+  <script defer src="script.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
 
-    <style>
-        /* (CSS sin cambios importantes, manteniendo el contenedor y el volteo) */
-        body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
-            font-family: sans-serif;
-        }
-
-        .camera-container {
-            position: relative;
-            width: 100%;
-            max-width: 800px;
-            overflow: hidden;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            aspect-ratio: 4 / 3; 
-        }
-
-        #camera-preview {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-            transform: scaleX(-1); /* Volteo de espejo */
-        }
-
-        /* El SVG del overlay estático (guía del rostro) */
-        #overlay-svg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none; 
-        }
-
-        /* El Canvas para dibujar la detección */
-        #detection-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            /* IMPORTANTE: NO VOLTEAMOS EL CANVAS con MediaPipe
-               MediaPipe nos da coordenadas absolutas del video original.
-               ¡El volteo se hace manualmente en el código al dibujar!
-            */
-        }
-    </style>
+    canvas {
+      position: absolute;
+    }
+  </style>
 </head>
 <body>
-
-    <h1>MediaPipe Detección de Rostro</h1>
-    <p id="loading-message" style="text-align: center;">Cargando modelos de MediaPipe... 🧠</p>
-    
-    <div class="camera-container">
-        
-        <video id="camera-preview" autoplay playsinline muted></video>
-
-        <svg id="overlay-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <path fill-rule="evenodd" 
-                  fill="rgba(255, 255, 255, 0.85)"
-                  d="M 0 0 H 100 V 100 H 0 Z 
-                     M 50 30 
-                     A 15 20 0 1 1 50 70 
-                     A 15 20 0 1 1 50 30 Z">
-            </path>
-            <path fill="none"
-                  stroke="#007bff"
-                  stroke-width="0.5"
-                  stroke-dasharray="2 2"
-                  d="M 50 30 
-                     A 15 20 0 1 1 50 70 
-                     A 15 20 0 1 1 50 30 Z">
-            </path>
-        </svg>
-
-        <canvas id="detection-canvas"></canvas>
-
-    </div>
-
-    <script>
-        // PASO 3: Accedemos a las clases desde el objeto global
-        // El CDN con 'type="module"' define window.MediaPipeTasksVision.
-        // Esperamos a que el DOM esté cargado para asegurarnos de que el CDN se inicializó.
-        document.addEventListener('DOMContentLoaded', () => {
-            if (!window.MediaPipeTasksVision) {
-                console.error("Error: MediaPipeTasksVision no se encontró. Revisa la consola para errores de red o CDN.");
-                return;
-            }
-            
-            const { FaceDetector, FilesetResolver, RunningMode } = window.MediaPipeTasksVision;
-
-            const videoElement = document.getElementById('camera-preview');
-            const canvas = document.getElementById('detection-canvas');
-            const loadingMessage = document.getElementById('loading-message');
-            const context = canvas.getContext('2d');
-
-            let faceDetector;
-            let lastVideoTime = -1;
-            let runningMode = RunningMode.VIDEO;
-
-            // --- Funciones Initialize, StartCamera, DetectAndDraw, Main (Sin cambios en la lógica) ---
-            
-            async function initializeFaceDetector() {
-                loadingMessage.innerText = "Descargando modelos y WASM...";
-                
-                const vision = await FilesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
-                );
-                
-                faceDetector = await FaceDetector.createFromOptions(
-                    vision,
-                    {
-                        baseOptions: {
-                            modelAssetPath: "./models/face_detector.tflite" 
-                        },
-                        runningMode: runningMode,
-                        minDetectionConfidence: 0.7 
-                    }
-                );
-
-                loadingMessage.innerText = "¡Detección lista! Iniciando cámara...";
-                console.log("MediaPipe Face Detector inicializado.");
-            }
-
-            async function startCamera() {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    videoElement.srcObject = stream;
-                    videoElement.addEventListener('loadeddata', () => {
-                        canvas.width = videoElement.videoWidth;
-                        canvas.height = videoElement.videoHeight;
-                        videoElement.play();
-                        requestAnimationFrame(detectAndDraw);
-                    });
-                } catch (error) {
-                    console.error("Error al acceder a la cámara: ", error);
-                    loadingMessage.innerText = "❌ Error: Asegúrate de tener cámara y otorgar permisos.";
-                }
-            }
-
-            function detectAndDraw(now) {
-                if (!faceDetector || !videoElement.currentTime || !videoElement.videoWidth) {
-                    requestAnimationFrame(detectAndDraw);
-                    return;
-                }
-
-                let results = null;
-                if (videoElement.currentTime !== lastVideoTime) {
-                    results = faceDetector.detectForVideo(videoElement, performance.now());
-                    lastVideoTime = videoElement.currentTime;
-                }
-
-                context.clearRect(0, 0, canvas.width, canvas.height);
-
-                if (results && results.detections.length > 0) {
-                    loadingMessage.style.display = 'none';
-                    
-                    for (const detection of results.detections) {
-                        const box = detection.boundingBox;
-                        
-                        // Manejo del Volteo
-                        const mirroredX = canvas.width - box.originX - box.width;
-                        
-                        // Dibujamos el recuadro de detección
-                        context.strokeStyle = "#007bff";
-                        context.lineWidth = 3;
-                        context.strokeRect(
-                            mirroredX, 
-                            box.originY, 
-                            box.width, 
-                            box.height
-                        );
-
-                        // Dibujamos los 6 Keypoints
-                        context.fillStyle = "red";
-                        for (const keypoint of detection.keypoints) {
-                            const mirroredKeypointX = canvas.width - (keypoint.x * canvas.width);
-                            const keypointY = keypoint.y * canvas.height;
-                            context.beginPath();
-                            context.arc(mirroredKeypointX, keypointY, 3, 0, 2 * Math.PI);
-                            context.fill();
-                        }
-                    }
-                }
-
-                requestAnimationFrame(detectAndDraw);
-            }
-
-            async function main() {
-                await initializeFaceDetector();
-                await startCamera();
-            }
-
-            // Ejecutamos main dentro del listener de DOMContentLoaded
-            main();
-        });
-
-    </script>
+  <video id="video" width="720" height="560" autoplay muted></video>
 </body>
 </html>
