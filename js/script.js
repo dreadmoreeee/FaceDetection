@@ -1,14 +1,16 @@
 const video = document.getElementById('video');
 const MODEL_URL = '/models';
-// Elementos DOM para la alineación
 const overlayGuide = document.getElementById('face-overlay-guide');
 
 // --- CONSTANTES DE ALINEACIÓN ---
-// Estas deben coincidir con las dimensiones CSS del óvalo en styles.css
-const GUIDE_WIDTH = 300; 
-const GUIDE_HEIGHT = 400;
-const TOLERANCE_CENTER = 30; // Tolerancia en píxeles para el centrado
-const TOLERANCE_SIZE = 1.2;  // La cara puede ser 20% más grande o más pequeña que el óvalo
+// Definimos el área de la guía en PORCENTAJE (más responsive que píxeles fijos)
+// Si la guía CSS es 300x400, asumimos que ocupa alrededor del 40-50% del ancho del contenedor.
+const GUIDE_CENTER_X = 50;  // Centro del óvalo es el 50% del ancho del video
+const GUIDE_CENTER_Y = 50;  // Centro del óvalo es el 50% del alto del video
+const GUIDE_WIDTH_PERCENT = 45; // Ancho objetivo de la cara debe ser ~45% del ancho del video.
+
+const TOLERANCE_CENTER_PERCENT = 8; // Tolerancia de centrado (8% del video)
+const TOLERANCE_SIZE = 1.2;          // La cara puede ser 20% más grande o más pequeña
 
 // --- Configuración e Inicialización ---
 
@@ -29,8 +31,9 @@ async function startVideo() {
   }
 }
 
-// 1. Escucha 'loadedmetadata' para establecer las dimensiones reales del video
+// 1. Escucha 'loadedmetadata' para establecer las dimensiones reales (Base para el escalado)
 video.addEventListener('loadedmetadata', () => {
+    // Establecemos las dimensiones internas del elemento video (source size)
     video.width = video.videoWidth;
     video.height = video.videoHeight;
 });
@@ -47,23 +50,22 @@ video.addEventListener('playing', () => {
     detectFaces(canvas, displaySize);
 });
 
+
 // 3. Bucle de Detección (requestAnimationFrame)
 async function detectFaces(canvas, displaySize) {
     
-    // Obtener las detecciones
     const detections = await faceapi.detectAllFaces(
       video, 
       new faceapi.TinyFaceDetectorOptions()
     ).withFaceLandmarks().withFaceExpressions();
     
-    // Escalar los resultados
     const resizedDetections = faceapi.resizeResults(detections, displaySize);
     
-    // Lógica de Alineación
+    // Lógica de Alineación (solo si hay una cara)
     if (resizedDetections.length > 0) {
-        checkAlignment(resizedDetections[0].detection);
+        // Pasamos la primera detección y las dimensiones del contenedor
+        checkAlignment(resizedDetections[0].detection, displaySize);
     } else {
-        // No hay rostro detectado, quitar la clase 'aligned'
         overlayGuide.classList.remove('aligned');
     }
 
@@ -74,51 +76,47 @@ async function detectFaces(canvas, displaySize) {
     faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
     faceapi.draw.drawFaceExpressions(canvas, resizedDetections);
 
-    // Repetir el bucle (rAF para eficiencia)
     requestAnimationFrame(() => detectFaces(canvas, displaySize));
 }
 
 
-// 4. Función de Verificación de Alineación (CORREGIDA PARA MÓVILES)
-function checkAlignment(detection) {
+// 4. Función de Verificación de Alineación (MÁS RESPONSIVE)
+function checkAlignment(detection, videoDimensions) {
     const box = detection.box;
     
-    // --- PASO 1: Determinar el centro del video en píxeles del DOM ---
-    const videoRect = video.getBoundingClientRect();
+    // --- PASO 1: Transformar Coordenadas a PORCENTAJE ---
+    // El 'box' está en las dimensiones internas del video (displaySize)
     
-    // El centro de la guía ovalada en coordenadas de PANTALLA
-    const guideScreenCenterX = videoRect.left + videoRect.width / 2;
-    const guideScreenCenterY = videoRect.top + videoRect.height / 2;
-
-    // --- PASO 2: Determinar el centro del rostro en píxeles de PANTALLA (Volteo aplicado) ---
+    // Centro del rostro en PORCENTAJE (0 a 100)
+    const faceCenterX_Percent = ((box.x + box.width / 2) / videoDimensions.width) * 100;
+    const faceCenterY_Percent = ((box.y + box.height / 2) / videoDimensions.height) * 100;
     
-    // Centro del rostro en píxeles del SOURCE (relativo al video source)
-    const faceSourceCenterX = box.x + box.width / 2;
-    const faceSourceCenterY = box.y + box.height / 2;
-
-    // Centro del rostro en píxeles de PANTALLA
-    const faceScreenX = videoRect.left + faceSourceCenterX * (videoRect.width / video.videoWidth);
-    const faceScreenY = videoRect.top + faceSourceCenterY * (videoRect.height / video.videoHeight);
+    // Ancho del rostro en PORCENTAJE
+    const faceWidth_Percent = (box.width / videoDimensions.width) * 100;
     
     
-    // *** CORRECCIÓN CLAVE PARA EFECTO ESPEJO ***
+    // --- PASO 2: CORRECCIÓN RESPONSIVE PARA EL VOLTEO ---
     // Si la cámara tiene efecto espejo (lo más común en móviles), 
-    // necesitamos invertir la coordenada X de la detección respecto al centro del video.
-    // Calculamos el centro X reflejado.
-    const mirroredFaceScreenCenterX = videoRect.left + (videoRect.width - (faceScreenX - videoRect.left));
+    // la posición horizontal necesita invertirse.
+    // Ej: Si el rostro está en el 10% (izquierda), el espejo es 90% (derecha).
+    const isMirrored = true; // Asumimos volteo para cámaras frontales
+    const finalFaceCenterX_Percent = isMirrored 
+        ? (100 - faceCenterX_Percent) 
+        : faceCenterX_Percent;
+    
 
-    // Usamos el centro X reflejado para la comparación
-    const diffX = Math.abs(mirroredFaceScreenCenterX - guideScreenCenterX);
-    const diffY = Math.abs(faceScreenY - guideScreenCenterY);
+    // --- PASO 3: Comprobar Centrado (en PORCENTAJE) ---
+    const diffX_Percent = Math.abs(finalFaceCenterX_Percent - GUIDE_CENTER_X);
+    const diffY_Percent = Math.abs(faceCenterY_Percent - GUIDE_CENTER_Y);
     
-    // --- PASO 3: Comprobar Centrado (Posición) ---
-    const isCentered = diffX < TOLERANCE_CENTER && diffY < TOLERANCE_CENTER;
+    const isCentered = diffX_Percent < TOLERANCE_CENTER_PERCENT && 
+                       diffY_Percent < TOLERANCE_CENTER_PERCENT;
     
-    // --- PASO 4: Comprobar Tamaño (El tamaño no cambia con el volteo) ---
-    const faceScreenWidth = box.width * (videoRect.width / video.videoWidth);
     
-    const isSized = faceScreenWidth > (GUIDE_WIDTH / TOLERANCE_SIZE) && 
-                    faceScreenWidth < (GUIDE_WIDTH * TOLERANCE_SIZE);
+    // --- PASO 4: Comprobar Tamaño (en PORCENTAJE) ---
+    // Comprueba si el ancho del rostro está en el rango objetivo (ej: entre 37.5% y 56.25%)
+    const isSized = faceWidth_Percent > (GUIDE_WIDTH_PERCENT / TOLERANCE_SIZE) && 
+                    faceWidth_Percent < (GUIDE_WIDTH_PERCENT * TOLERANCE_SIZE);
                     
     // --- PASO 5: Aplicar Feedback ---
     if (isCentered && isSized) {
