@@ -6,17 +6,17 @@ const photoContainer = document.getElementById('final-photo-container');
 const finalPhoto = document.getElementById('final-photo');
 
 // --- CONSTANTES DE ALINEACIÓN ---
-// Ajustadas al óvalo de 200x300px (Ancho objetivo: 28%)
 const GUIDE_CENTER_X = 50;  
 const GUIDE_CENTER_Y = 50;  
 const GUIDE_WIDTH_PERCENT = 28; 
 
-// CAMBIO: Tolerancia de centrado reducida a 5% (más estricto)
 const TOLERANCE_CENTER_PERCENT = 5; 
 
-// CAMBIO: Tolerancia de tamaño (más estricto en el límite inferior)
-const TOLERANCE_SIZE_MIN = 1.1; // La cara debe ser al menos ~90% del óvalo (28% / 1.1 ≈ 25.4%)
-const TOLERANCE_SIZE_MAX = 1.2; // La cara puede ser máximo ~120% del óvalo
+// CAMBIO CRÍTICO: Ajuste de límites de tamaño para permitir caras más pequeñas y evitar caras muy grandes.
+// 1. Límite MÍNIMO: 0.7 (Permite que la cara sea hasta el 70% del ancho del óvalo)
+const TOLERANCE_SIZE_MIN_FACTOR = 0.7;  
+// 2. Límite MÁXIMO: 1.05 (La cara NO DEBE ser mucho más grande que el óvalo)
+const TOLERANCE_SIZE_MAX_FACTOR = 1.05; 
 
 // --- CONTROL DE FLUJO DE CAPTURA ---
 let isCountingDown = false; 
@@ -64,7 +64,6 @@ video.addEventListener('playing', () => {
 // 3. Bucle de Detección (requestAnimationFrame)
 async function detectFaces(canvas, displaySize) {
     
-    // Si la foto ya fue tomada, detener el proceso
     if (photoContainer.classList.contains('show')) {
         requestAnimationFrame(() => detectFaces(canvas, displaySize));
         return;
@@ -84,22 +83,18 @@ async function detectFaces(canvas, displaySize) {
         if (isAligned) {
             overlayGuide.classList.add('aligned');
             if (!isCountingDown) {
-                // Iniciar la cuenta atrás solo si está alineado y no ha comenzado
                 isCountingDown = true;
                 startCountdown();
             }
         } else {
             overlayGuide.classList.remove('aligned');
             if (isCountingDown) {
-                // BUG FIX: Abortar la cuenta atrás si el rostro se sale del óvalo
                 abortCountdown(); 
             }
         }
     } else {
-        // No hay rostro detectado
         overlayGuide.classList.remove('aligned');
         if (isCountingDown) {
-            // BUG FIX: Abortar la cuenta atrás si el rostro desaparece
             abortCountdown(); 
         }
     }
@@ -108,8 +103,8 @@ async function detectFaces(canvas, displaySize) {
     const context = canvas.getContext('2d');
     context.clearRect(0, 0, canvas.width, canvas.height);
     faceapi.draw.drawDetections(canvas, resizedDetections);
-    faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
-    faceapi.draw.drawFaceExpressions(canvas, resizedDetections);
+    faceapi.draw.drawFaceLandmarks(canvas, resizedDetecciones);
+    faceapi.draw.drawFaceExpressions(canvas, resizedDetecciones);
 
     requestAnimationFrame(() => detectFaces(canvas, displaySize));
 }
@@ -136,9 +131,14 @@ function checkAlignment(detection, videoDimensions) {
     const isCentered = diffX_Percent < TOLERANCE_CENTER_PERCENT && 
                        diffY_Percent < TOLERANCE_CENTER_PERCENT;
     
-    // Comprobar Tamaño (Uso de TOLERANCE_SIZE_MIN y MAX)
-    const isSized = faceWidth_Percent > (GUIDE_WIDTH_PERCENT / TOLERANCE_SIZE_MIN) && 
-                    faceWidth_Percent < (GUIDE_WIDTH_PERCENT * TOLERANCE_SIZE_MAX);
+    // Comprobar Tamaño (Uso de los nuevos factores)
+    // Límite Mínimo (Permite cara más pequeña, 70% del óvalo)
+    const minSize = GUIDE_WIDTH_PERCENT * TOLERANCE_SIZE_MIN_FACTOR; 
+    // Límite Máximo (Impide cara más grande, 105% del óvalo)
+    const maxSize = GUIDE_WIDTH_PERCENT * TOLERANCE_SIZE_MAX_FACTOR; 
+
+    const isSized = faceWidth_Percent >= minSize && 
+                    faceWidth_Percent <= maxSize;
                     
     return isCentered && isSized;
 }
@@ -195,7 +195,6 @@ function takePhoto() {
 }
 
 function showPhoto(imageDataURL) {
-    // Detiene el video
     video.pause();
     
     // Oculta los elementos de detección con una animación suave
