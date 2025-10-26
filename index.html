@@ -49,6 +49,7 @@
         }
 
         /* === El Estilo de Máscara Oscura y Óvalo Perforado === */
+        /* === El Estilo de Máscara Oscura y Óvalo Perforado === */
         .mask-frame {
             position: absolute;
             top: 0;
@@ -60,20 +61,21 @@
             /* Propiedad para darle forma de óvalo al "agujero" */
             border-radius: 50%; 
 
-            /* ********************************************** */
-            /* ** CAMBIO CLAVE PARA HACER EL ÓVALO VERTICAL ** */
-            /* ********************************************** */
+            /* *************************************************** */
+            /* ** CAMBIOS CLAVE: Óvalo más ajustado al rostro ** */
+            /* *************************************************** */
             
-            /* Reducimos el ancho a 40% (antes 50%) */
-            width: 40%; 
-            /* Mantenemos o aumentamos la altura a 75% */
-            height: 75%;
+            /* Ancho más estrecho: 35% del contenedor */
+            width: 35%; 
+            /* Altura mayor: 80% del contenedor */
+            height: 80%;
             
-            /* Recalculamos el centrado */
-            /* TOP: (100% - 75% de altura) / 2 = 12.5% */
-            top: 12.5%; 
-            /* LEFT: (100% - 40% de ancho) / 2 = 30% */
-            left: 30%; 
+            /* Recalculamos la posición para centrarlo: */
+            
+            /* TOP: (100% - 80% de altura) / 2 = 10% */
+            top: 10%; 
+            /* LEFT: (100% - 35% de ancho) / 2 = 32.5% */
+            left: 32.5%; 
 
             /* Estilo para el borde del óvalo */
             border: 3px dashed #007bff; /* Borde punteado azul */
