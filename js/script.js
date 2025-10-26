@@ -11,11 +11,7 @@ const GUIDE_CENTER_Y = 50;
 const GUIDE_WIDTH_PERCENT = 28; 
 
 const TOLERANCE_CENTER_PERCENT = 5; 
-
-// CAMBIO CRÍTICO: Ajuste de límites de tamaño para permitir caras más pequeñas y evitar caras muy grandes.
-// 1. Límite MÍNIMO: 0.7 (Permite que la cara sea hasta el 70% del ancho del óvalo)
-const TOLERANCE_SIZE_MIN_FACTOR = 0.7;  
-// 2. Límite MÁXIMO: 1.05 (La cara NO DEBE ser mucho más grande que el óvalo)
+const TOLERANCE_SIZE_MIN_FACTOR = 0.8;  
 const TOLERANCE_SIZE_MAX_FACTOR = 1.05; 
 
 // --- CONTROL DE FLUJO DE CAPTURA ---
@@ -210,3 +206,4 @@ function showPhoto(imageDataURL) {
     finalPhoto.src = imageDataURL;
     photoContainer.classList.add('show');
 }
+
