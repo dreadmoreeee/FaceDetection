@@ -1,4 +1,3 @@
-/* Base: Asegura que el contenido ocupe toda la pantalla y esté centrado */
 body {
   margin: 0;
   padding: 0;
@@ -8,10 +7,10 @@ body {
   justify-content: center;
   align-items: center;
   overflow: hidden; 
-  background-color: #f0f0f0;
+  background-color: #f0f0f0; 
+  font-family: Arial, sans-serif;
 }
 
-/* El elemento de video y el canvas están posicionados absolutamente */
 #video, canvas {
   position: absolute;
   max-width: 100vw;
@@ -22,9 +21,35 @@ canvas {
   z-index: 5;
 }
 
-/* ---------------------------------------------------- */
-/* Estilos del Overlay de Alineación (Máscara de Cabeza) */
-/* ---------------------------------------------------- */
+#instruction-box {
+    position: fixed; 
+    top: 5vh; 
+    left: 50%;
+    transform: translateX(-50%); 
+    
+    background-color: rgba(255, 255, 255, 0.9); 
+    color: #333;
+    padding: 15px 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); 
+    
+    z-index: 50; 
+    text-align: center;
+    min-width: 250px;
+    transition: background-color 0.3s, color 0.3s, opacity 0.3s;
+}
+
+#instruction-text {
+    margin: 0;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+#instruction-box.success {
+    background-color: #00ff6a;
+    color: #000;
+    box-shadow: 0 4px 15px rgba(0, 255, 106, 0.5);
+}
 
 #face-overlay-guide {
   position: absolute;
@@ -37,13 +62,13 @@ canvas {
   background-color: transparent;
 }
 
-/* El pseudo-elemento ::after crea la forma de la guía y la máscara */
 #face-overlay-guide::after {
   content: '';
   display: block;
   position: absolute;
   top: 50%;
   left: 50%;
+  
   width: 200px; 
   height: 300px; 
   
@@ -54,7 +79,6 @@ canvas {
   transition: all 0.3s ease-in-out;
 }
 
-/* --- EFECTOS DE ALINEACIÓN (Feedback Positivo) --- */
 #face-overlay-guide.aligned::after {
   border: 4px solid #00ff6a; 
   box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.2); 
@@ -67,25 +91,6 @@ canvas {
   100% { transform: translate(-50%, -50%) scale(1); }
 }
 
-/* --- ESTILOS DEL MENSAJE DE CUENTA ATRÁS --- */
-#countdown-message {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 20;
-    font-size: 3em;
-    font-weight: bold;
-    color: #00ff6a;
-    text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-    opacity: 0;
-    transition: opacity 0.2s ease-in-out;
-}
-#countdown-message.visible {
-    opacity: 1;
-}
-
-/* --- ESTILOS DE LA FOTO FINAL --- */
 #final-photo-container {
     position: fixed;
     top: 0;
